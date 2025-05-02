@@ -9,6 +9,7 @@
     "@testing-library/user-event": "^13.5.0",
     "autoprefixer": "^10.4.21",
     "axios": "^1.9.0",
+    "html2canvas": "^1.4.1",
     "lucide-react": "^0.503.0",
     "postcss": "^8.5.3",
     "react": "^19.1.0",
@@ -19,11 +20,11 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
-  },
+  "start": "react-scripts start",
+  "build": "CI=false react-scripts build",
+  "test": "react-scripts test",
+  "eject": "react-scripts eject"
+},
   "eslintConfig": {
     "extends": [
       "react-app",

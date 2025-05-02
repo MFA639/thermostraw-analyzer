@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { Database } from 'lucide-react';
+import html2canvas from 'html2canvas';
 import ImprovedDistributionChart from './components/ImprovedDistributionChart';
 import FractionInputForm from './components/FractionInputForm';
 import PredictionResult from './components/PredictionResult';
@@ -12,6 +13,7 @@ function App() {
   const [error, setError] = useState('');
   const [fractionData, setFractionData] = useState([]);
   const [autoMode, setAutoMode] = useState(false);
+  const chartRef = useRef(null);
   
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
   
@@ -54,6 +56,39 @@ function App() {
     ];
   };
   
+  // Fonction pour capturer le graphique en tant qu'image
+  const captureChart = useCallback(async () => {
+    if (!chartRef.current) return null;
+    
+    try {
+      const canvas = await html2canvas(chartRef.current, {
+        scale: 2, // Meilleure qualité
+        backgroundColor: null,
+        logging: false
+      });
+      
+      return canvas.toDataURL('image/png');
+    } catch (err) {
+      console.error('Erreur lors de la capture du graphique:', err);
+      return null;
+    }
+  }, []);
+  
+  // Fonction pour envoyer l'image au backend
+  const sendChartImage = useCallback(async (fractions, chartImage) => {
+    try {
+      const response = await axios.post(`${API_URL}/save-chart-image`, {
+        fractions,
+        chart_image: chartImage
+      });
+      
+      return response.data;
+    } catch (err) {
+      console.error('Erreur lors de l\'envoi de l\'image:', err);
+      return null;
+    }
+  }, [API_URL]);
+  
   // Effectue un calcul automatique au chargement si le mode auto est activé
   useEffect(() => {
     const params = getUrlParams();
@@ -73,7 +108,7 @@ function App() {
     if (autoMode) {
       handleSubmit(params);
     }
-  }, []);
+  }, [autoMode]);
   
   const handleSubmit = async (fractions) => {
     setLoading(true);
@@ -85,6 +120,17 @@ function App() {
       
       // Mise à jour des données pour le graphique
       setFractionData(formatFractionData(fractions, response.data.optimal_ranges));
+      
+      // Si en mode auto, capturer et envoyer l'image après rendu du graphique
+      if (autoMode) {
+        // Attendre que le graphique soit rendu
+        setTimeout(async () => {
+          const chartImage = await captureChart();
+          if (chartImage) {
+            await sendChartImage(fractions, chartImage);
+          }
+        }, 1000); // Délai pour s'assurer que le graphique est rendu
+      }
     } catch (err) {
       console.error('Erreur de prédiction:', err);
       setError(err.response?.data?.detail || 'Erreur lors de la prédiction. Vérifiez que le serveur est démarré.');
@@ -124,8 +170,10 @@ function App() {
           {/* Résultat de prédiction */}
           {prediction && <PredictionResult prediction={prediction} />}
           
-          {/* Graphique de distribution */}
-          {fractionData.length > 0 && <ImprovedDistributionChart fractionData={fractionData} />}
+          {/* Graphique de distribution avec référence pour la capture */}
+          <div ref={chartRef}>
+            {fractionData.length > 0 && <ImprovedDistributionChart fractionData={fractionData} />}
+          </div>
           
           {/* Message d'erreur */}
           {error && (
