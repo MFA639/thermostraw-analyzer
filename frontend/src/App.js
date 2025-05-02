@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { ArrowUpRight, Database } from 'lucide-react';
+import { Database } from 'lucide-react';
 import ImprovedDistributionChart from './components/ImprovedDistributionChart';
 import FractionInputForm from './components/FractionInputForm';
 import PredictionResult from './components/PredictionResult';
