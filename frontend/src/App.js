@@ -11,8 +11,37 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fractionData, setFractionData] = useState([]);
+  const [autoMode, setAutoMode] = useState(false);
   
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+  
+  // Fonction pour extraire les paramètres de l'URL
+  const getUrlParams = () => {
+    const params = new URLSearchParams(window.location.search);
+    const autoCalc = params.get('auto') === 'true';
+    setAutoMode(autoCalc);
+    
+    const urlParams = {
+      taux_2mm: parseFloat(params.get('taux_2mm')),
+      taux_1mm: parseFloat(params.get('taux_1mm')),
+      taux_500um: parseFloat(params.get('taux_500um')),
+      taux_250um: parseFloat(params.get('taux_250um')),
+      taux_0: parseFloat(params.get('taux_0'))
+    };
+    
+    // Utiliser les valeurs par défaut si les paramètres sont manquants ou invalides
+    if (Object.values(urlParams).some(value => isNaN(value))) {
+      return {
+        taux_2mm: 15.83,
+        taux_1mm: 53.44,
+        taux_500um: 20.46,
+        taux_250um: 7.26,
+        taux_0: 3.01
+      };
+    }
+    
+    return urlParams;
+  };
   
   // Fonction pour formater les données des fractions pour le graphique
   const formatFractionData = (fractions, optimalRanges) => {
@@ -25,16 +54,11 @@ function App() {
     ];
   };
   
-  // Données par défaut
+  // Effectue un calcul automatique au chargement si le mode auto est activé
   useEffect(() => {
-    const defaultFractions = {
-      taux_2mm: 15.83,
-      taux_1mm: 53.44,
-      taux_500um: 20.46,
-      taux_250um: 7.26,
-      taux_0: 3.01
-    };
+    const params = getUrlParams();
     
+    // Chargement des données par défaut pour le graphique
     const defaultOptimalRanges = {
       taux_2mm: [12, 18],
       taux_1mm: [53, 58],
@@ -43,7 +67,12 @@ function App() {
       taux_0: [0, 1]
     };
     
-    setFractionData(formatFractionData(defaultFractions, defaultOptimalRanges));
+    setFractionData(formatFractionData(params, defaultOptimalRanges));
+    
+    // Si mode auto, lancer le calcul
+    if (autoMode) {
+      handleSubmit(params);
+    }
   }, []);
   
   const handleSubmit = async (fractions) => {
@@ -76,6 +105,9 @@ function App() {
           <h1 className="text-2xl font-bold">ThermoStraw Analyzer</h1>
           <div className="flex items-center space-x-4">
             <span className="text-sm">Modèle: GP V4-BEST (EE_best)</span>
+            {autoMode && (
+              <span className="text-xs bg-blue-600 px-2 py-1 rounded">Mode Auto</span>
+            )}
             <button 
               className="bg-blue-600 px-3 py-1 rounded shadow hover:bg-blue-500 text-sm flex items-center"
               onClick={handleExportCSV}
@@ -87,8 +119,8 @@ function App() {
       </header>
       
       <div className="flex flex-1 p-4 gap-4 overflow-auto">
-        {/* Panneau principal */}
-        <div className="flex flex-col w-2/3 gap-4">
+        {/* Panneau principal - adapté pour le mode auto */}
+        <div className={`flex flex-col ${autoMode ? 'w-full' : 'w-2/3'} gap-4`}>
           {/* Résultat de prédiction */}
           {prediction && <PredictionResult prediction={prediction} />}
           
@@ -104,27 +136,42 @@ function App() {
           )}
         </div>
         
-        {/* Panneau latéral */}
-        <div className="w-1/3 flex flex-col gap-4">
-          {/* Formulaire de saisie */}
-          <FractionInputForm onSubmit={handleSubmit} isLoading={loading} />
-          
-          {/* Informations supplémentaires */}
-          <div className="bg-white rounded-lg shadow-md p-4">
-            <h2 className="text-xl font-semibold mb-3">Informations</h2>
-            <div className="text-sm text-gray-600">
-              <p>Cette application utilise le modèle GP V4-BEST avec l'indicateur EE_best pour prédire la conductivité thermique de la paille hachée à partir de sa distribution granulométrique.</p>
-              <p className="mt-2">La prédiction est basée sur les paramètres optimisés suivants :</p>
-              <ul className="list-disc pl-5 mt-1">
-                <li>k500 = 1.83</li>
-                <li>k250 = 3.04</li>
-                <li>c = 0.196</li>
-                <li>dmax = 1.76%</li>
-                <li>α = 0.572</li>
-              </ul>
+        {/* Panneau latéral - caché en mode auto */}
+        {!autoMode && (
+          <div className="w-1/3 flex flex-col gap-4">
+            {/* Formulaire de saisie */}
+            <FractionInputForm onSubmit={handleSubmit} isLoading={loading} />
+            
+            {/* Informations supplémentaires */}
+            <div className="bg-white rounded-lg shadow-md p-4">
+              <h2 className="text-xl font-semibold mb-3">Informations</h2>
+              <div className="text-sm text-gray-600">
+                <p>Cette application utilise le modèle GP V4-BEST avec l'indicateur EE_best pour prédire la conductivité thermique de la paille hachée à partir de sa distribution granulométrique.</p>
+                <p className="mt-2">La prédiction est basée sur les paramètres optimisés suivants :</p>
+                <ul className="list-disc pl-5 mt-1">
+                  <li>k500 = 1.83</li>
+                  <li>k250 = 3.04</li>
+                  <li>c = 0.196</li>
+                  <li>dmax = 1.76%</li>
+                  <li>α = 0.572</li>
+                </ul>
+              </div>
+              
+              {/* Ajout du graphique de validation */}
+              <div className="mt-4 border-t pt-3">
+                <h3 className="text-lg font-semibold mb-2">Validation du modèle</h3>
+                <img 
+                  src="/validation-graph.png" 
+                  alt="Graphique de validation GP V4-BEST" 
+                  className="w-full rounded-md border border-gray-200"
+                />
+                <p className="text-xs text-gray-600 mt-1 text-center">
+                  Validation du modèle GP V4-BEST: prédiction vs mesures réelles
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
