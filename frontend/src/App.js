@@ -66,75 +66,59 @@ function App() {
     }
     
     try {
-      // S'assurer que le graphique est visible et rendu
       const chartElement = chartRef.current;
       console.log('Dimensions du graphique:', chartElement.offsetWidth, 'x', chartElement.offsetHeight);
       
-      // Déterminer le scale optimal en fonction des dimensions
-      const originalWidth = chartElement.offsetWidth;
-      const originalHeight = chartElement.offsetHeight;
-      const maxPixels = 980000; // Plus proche de la limite de 1M
-      
-      // Calculer le scale maximal pour rester sous la limite de pixels
-      let optimalScale = Math.sqrt(maxPixels / (originalWidth * originalHeight));
-      optimalScale = Math.min(optimalScale, 3); // Limiter à 3 pour éviter des images trop grandes
-      optimalScale = Math.max(optimalScale, 1); // Au minimum 1 pour garder la qualité
-      
-      console.log(`Scale optimal calculé: ${optimalScale}`);
-      
-      // Capture initiale avec le scale optimisé
+      // Capturer avec une haute qualité
       const canvas = await html2canvas(chartElement, {
-        scale: optimalScale,
+        scale: 3, // Augmenter le scale pour plus de détails
         backgroundColor: '#ffffff',
         logging: false,
         useCORS: true,
         allowTaint: true,
         windowWidth: chartElement.scrollWidth,
         windowHeight: chartElement.scrollHeight,
-        // Options additionnelles pour améliorer la qualité
         imageTimeout: 0,
-        removeContainer: true,
         letterRendering: true
       });
       
+      // Calculer les dimensions optimales en préservant le ratio
+      const maxPixels = 980000;
       const currentPixels = canvas.width * canvas.height;
-      console.log(`Image capturée: ${canvas.width}x${canvas.height} = ${currentPixels} pixels`);
+      const aspectRatio = canvas.width / canvas.height;
+      
+      console.log(`Taille initiale: ${canvas.width}x${canvas.height} (${currentPixels} pixels)`);
+      console.log(`Ratio d'aspect: ${aspectRatio}`);
       
       let finalCanvas = canvas;
       
-      // Si on dépasse encore, redimensionner proportionnellement
       if (currentPixels > maxPixels) {
-        console.log('Redimensionnement supplémentaire nécessaire...');
-        
+        // Calculer les nouvelles dimensions en préservant le ratio
         const scaleFactor = Math.sqrt(maxPixels / currentPixels);
         const newWidth = Math.floor(canvas.width * scaleFactor);
         const newHeight = Math.floor(canvas.height * scaleFactor);
         
+        // Créer un nouveau canvas avec antialiasing
         const resizedCanvas = document.createElement('canvas');
         resizedCanvas.width = newWidth;
         resizedCanvas.height = newHeight;
         
         const ctx = resizedCanvas.getContext('2d');
-        // Utiliser une meilleure qualité d'interpolation
+        
+        // Activer l'antialiasing pour une meilleure qualité
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
+        
+        // Dessiner avec la meilleure qualité possible
         ctx.drawImage(canvas, 0, 0, newWidth, newHeight);
         
         finalCanvas = resizedCanvas;
         console.log(`Image redimensionnée: ${newWidth}x${newHeight}`);
       }
       
-      // Utiliser PNG pour une meilleure qualité
+      // Utiliser PNG pour maintenir la qualité
       const dataUrl = finalCanvas.toDataURL('image/png');
-      console.log('Image finale, taille des données:', dataUrl.length);
-      
-      // Vérifier la taille en octets - si trop grosse, comprimer en JPEG
-      if (dataUrl.length > 1500000) { // Si plus de 1.5MB
-        console.log('Image PNG trop grande, conversion en JPEG haute qualité...');
-        const jpegUrl = finalCanvas.toDataURL('image/jpeg', 0.92); // 92% de qualité
-        console.log('Image JPEG, taille:', jpegUrl.length);
-        return jpegUrl;
-      }
+      console.log('Image finale (PNG), taille: ' + dataUrl.length);
       
       return dataUrl;
     } catch (err) {
