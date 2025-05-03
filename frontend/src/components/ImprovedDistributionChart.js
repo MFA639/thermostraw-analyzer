@@ -7,7 +7,8 @@ import {
   CartesianGrid,
   Legend,
   ResponsiveContainer,
-  ComposedChart
+  ComposedChart,
+  Tooltip
 } from "recharts";
 
 /* ---------- Config ---------- */
@@ -107,7 +108,7 @@ const ImprovedDistributionChart = ({ fractionData }) => {
     <>
       <div className="bg-white p-4 rounded-lg shadow-md">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold">Distribution granulométrique</h2>
+          <h2 className="text-xl font-semibold">Distribution granulométrique vs. plages optimales</h2>
           <button
             onClick={handleOpenModal}
             className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow text-sm"
@@ -122,12 +123,17 @@ const ImprovedDistributionChart = ({ fractionData }) => {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" tick={customXAxisTick} interval={0} />
               <YAxis domain={[0, 70]} label={{ value: "%", angle: -90, position: "insideLeft" }} />
-              {['70','80','90','95'].map(pct => (
-                <React.Fragment key={pct}>
-                  <Line type="monotone" dataKey={`min_conf_${pct}`} strokeOpacity={0.3} dot={emptyDot} />
-                  <Line type="monotone" dataKey={`max_conf_${pct}`} strokeOpacity={0.3} dot={emptyDot} />
-                </React.Fragment>
-              ))}
+              <Tooltip />
+              {/* bandes de confiance */}
+              <Line type="monotone" dataKey="min_conf_70" stroke="#f97316" strokeOpacity={0.3} dot={emptyDot} />
+              <Line type="monotone" dataKey="max_conf_70" stroke="#f97316" strokeOpacity={0.3} dot={emptyDot} />
+              <Line type="monotone" dataKey="min_conf_80" stroke="#facc15" strokeOpacity={0.4} dot={emptyDot} />
+              <Line type="monotone" dataKey="max_conf_80" stroke="#facc15" strokeOpacity={0.4} dot={emptyDot} />
+              <Line type="monotone" dataKey="min_conf_90" stroke="#22c55e" strokeOpacity={0.5} dot={emptyDot} />
+              <Line type="monotone" dataKey="max_conf_90" stroke="#22c55e" strokeOpacity={0.5} dot={emptyDot} />
+              <Line type="monotone" dataKey="min_conf_95" stroke="#166534" strokeWidth={1.5} strokeOpacity={0.6} dot={emptyDot} />
+              <Line type="monotone" dataKey="max_conf_95" stroke="#166534" strokeWidth={1.5} strokeOpacity={0.6} dot={emptyDot} />
+              {/* limites et valeur mesurée */}
               <Line type="monotone" dataKey="min" stroke="#000" strokeDasharray="4 4" dot={thresholdDot} />
               <Line type="monotone" dataKey="max" stroke="#000" strokeDasharray="4 4" dot={thresholdDot} />
               <Line type="monotone" dataKey="échantillon" stroke="#3b82f6" strokeWidth={2.5} dot />
