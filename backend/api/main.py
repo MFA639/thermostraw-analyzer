@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Union
 import numpy as np
 import sys
 import os
+from api.chart import router as chart_router
 
 # Ajout du répertoire parent au path pour l'importation
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -12,6 +13,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from models.gaussian_process import ThermalConductivityPredictor
 
 app = FastAPI(title="ThermoStraw Analyzer API")
+app.include_router(chart_router)
 
 # Configuration du CORS pour permettre les requêtes du frontend
 app.add_middleware(
