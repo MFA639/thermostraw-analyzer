@@ -58,16 +58,36 @@ function App() {
   
   // Fonction pour capturer le graphique en tant qu'image
   const captureChart = useCallback(async () => {
-    if (!chartRef.current) return null;
+    console.log('Début de la capture du graphique...');
+    
+    if (!chartRef.current) {
+      console.error('Référence au graphique non trouvée');
+      return null;
+    }
     
     try {
-      const canvas = await html2canvas(chartRef.current, {
+      // S'assurer que le graphique est visible et rendu
+      const chartElement = chartRef.current;
+      console.log('Dimensions du graphique:', chartElement.offsetWidth, 'x', chartElement.offsetHeight);
+      
+      const canvas = await html2canvas(chartElement, {
         scale: 2, // Meilleure qualité
-        backgroundColor: null,
-        logging: false
+        backgroundColor: '#ffffff', // Fond blanc explicite
+        logging: true, // Activer les logs pour le débogage
+        useCORS: true, // Permettre les ressources cross-origin
+        allowTaint: true
       });
       
-      return canvas.toDataURL('image/png');
+      const dataUrl = canvas.toDataURL('image/png');
+      console.log('Image capturée, taille des données:', dataUrl.length);
+      
+      // Vérifier que l'image est valide
+      if (dataUrl.length < 100) {
+        console.error('Image capturée trop petite, probablement invalide');
+        return null;
+      }
+      
+      return dataUrl;
     } catch (err) {
       console.error('Erreur lors de la capture du graphique:', err);
       return null;
@@ -76,12 +96,21 @@ function App() {
   
   // Fonction pour envoyer l'image au backend
   const sendChartImage = useCallback(async (fractions, chartImage) => {
+    console.log('Envoi de l\'image au backend...');
+    
     try {
+      // Vérifier que l'image est valide
+      if (!chartImage || chartImage.length < 100) {
+        console.error('Image invalide, annulation de l\'envoi');
+        return null;
+      }
+      
       const response = await axios.post(`${API_URL}/save-chart-image`, {
         fractions,
         chart_image: chartImage
       });
       
+      console.log('Réponse du backend:', response.data);
       return response.data;
     } catch (err) {
       console.error('Erreur lors de l\'envoi de l\'image:', err);
@@ -92,6 +121,8 @@ function App() {
   // Effectue un calcul automatique au chargement si le mode auto est activé
   useEffect(() => {
     const params = getUrlParams();
+    console.log('Mode auto:', autoMode);
+    console.log('Paramètres URL:', params);
     
     // Chargement des données par défaut pour le graphique
     const defaultOptimalRanges = {
@@ -106,6 +137,7 @@ function App() {
     
     // Si mode auto, lancer le calcul
     if (autoMode) {
+      console.log('Lancement du calcul automatique...');
       handleSubmit(params);
     }
   }, [autoMode]);
@@ -113,9 +145,12 @@ function App() {
   const handleSubmit = async (fractions) => {
     setLoading(true);
     setError('');
+    console.log('Soumission des fractions:', fractions);
     
     try {
       const response = await axios.post(`${API_URL}/predict`, fractions);
+      console.log('Réponse de prédiction reçue:', response.data);
+      
       setPrediction(response.data);
       
       // Mise à jour des données pour le graphique
@@ -123,13 +158,29 @@ function App() {
       
       // Si en mode auto, capturer et envoyer l'image après rendu du graphique
       if (autoMode) {
-        // Attendre que le graphique soit rendu
+        console.log('Mode auto détecté, préparation pour la capture d\'image...');
+        
+        // Attendre que le graphique soit rendu complètement
+        // Augmenter le délai pour s'assurer que Recharts a terminé le rendu
         setTimeout(async () => {
+          console.log('Tentative de capture du graphique après délai...');
           const chartImage = await captureChart();
+          
           if (chartImage) {
-            await sendChartImage(fractions, chartImage);
+            console.log('Image capturée avec succès, envoi au backend...');
+            const result = await sendChartImage(fractions, chartImage);
+            
+            if (result) {
+              console.log('Image envoyée avec succès au backend');
+              // Optionnel: Ajouter un indicateur visuel de succès
+              console.log('Image stockée avec la clé:', result.key);
+            } else {
+              console.error('Échec de l\'envoi de l\'image au backend');
+            }
+          } else {
+            console.error('Échec de la capture de l\'image');
           }
-        }, 1000); // Délai pour s'assurer que le graphique est rendu
+        }, 2000); // Augmenté à 2 secondes pour garantir le rendu complet
       }
     } catch (err) {
       console.error('Erreur de prédiction:', err);
@@ -171,7 +222,7 @@ function App() {
           {prediction && <PredictionResult prediction={prediction} />}
           
           {/* Graphique de distribution avec référence pour la capture */}
-          <div ref={chartRef}>
+          <div ref={chartRef} style={{ backgroundColor: 'white' }}>
             {fractionData.length > 0 && <ImprovedDistributionChart fractionData={fractionData} />}
           </div>
           
