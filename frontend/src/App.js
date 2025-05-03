@@ -70,15 +70,45 @@ function App() {
       const chartElement = chartRef.current;
       console.log('Dimensions du graphique:', chartElement.offsetWidth, 'x', chartElement.offsetHeight);
       
+      // Capture initiale avec une bonne qualité
       const canvas = await html2canvas(chartElement, {
-        scale: 2, // Meilleure qualité
-        backgroundColor: '#ffffff', // Fond blanc explicite
-        logging: true, // Activer les logs pour le débogage
-        useCORS: true, // Permettre les ressources cross-origin
+        scale: 2, // Bonne qualité initiale
+        backgroundColor: '#ffffff',
+        logging: true,
+        useCORS: true,
         allowTaint: true
       });
       
-      const dataUrl = canvas.toDataURL('image/png');
+      // Vérification et redimensionnement si nécessaire
+      const maxPixels = 900000; // Marge de sécurité (< 1 million)
+      const currentPixels = canvas.width * canvas.height;
+      console.log(`Taille de l'image capturée: ${canvas.width}x${canvas.height} = ${currentPixels} pixels`);
+      
+      let finalCanvas = canvas;
+      
+      if (currentPixels > maxPixels) {
+        console.log('Image trop grande, redimensionnement nécessaire...');
+        
+        // Calculer le facteur de réduction nécessaire
+        const scaleFactor = Math.sqrt(maxPixels / currentPixels);
+        
+        // Créer un nouveau canvas redimensionné
+        const resizedCanvas = document.createElement('canvas');
+        const newWidth = Math.floor(canvas.width * scaleFactor);
+        const newHeight = Math.floor(canvas.height * scaleFactor);
+        
+        resizedCanvas.width = newWidth;
+        resizedCanvas.height = newHeight;
+        
+        const ctx = resizedCanvas.getContext('2d');
+        ctx.drawImage(canvas, 0, 0, newWidth, newHeight);
+        
+        finalCanvas = resizedCanvas;
+        console.log(`Image redimensionnée à ${newWidth}x${newHeight} = ${newWidth * newHeight} pixels`);
+      }
+      
+      // Conversion en JPEG avec compression pour réduire davantage la taille
+      const dataUrl = finalCanvas.toDataURL('image/jpeg', 0.8); // 80% de qualité JPEG
       console.log('Image capturée, taille des données:', dataUrl.length);
       
       // Vérifier que l'image est valide
