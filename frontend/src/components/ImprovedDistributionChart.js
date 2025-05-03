@@ -45,11 +45,14 @@ const ImprovedDistributionChart = ({ fractionData }) => {
         échantillon: value,
         min,
         max,
-        // bandes de confiance
-        min_conf_95: Math.max(0, min - 1), max_conf_95: Math.min(70, max + 1),
-        min_conf_90: Math.max(0, min - 3), max_conf_90: Math.min(70, max + 3),
-        min_conf_80: Math.max(0, min - 6), max_conf_80: Math.min(70, max + 6),
-        min_conf_70: Math.max(0, min - 10), max_conf_70: Math.min(70, max + 10),
+        min_conf_95: Math.max(0, min - 1),
+        max_conf_95: Math.min(70, max + 1),
+        min_conf_90: Math.max(0, min - 3),
+        max_conf_90: Math.min(70, max + 3),
+        min_conf_80: Math.max(0, min - 6),
+        max_conf_80: Math.min(70, max + 6),
+        min_conf_70: Math.max(0, min - 10),
+        max_conf_70: Math.min(70, max + 10),
         inRange,
         isInterpolated
       };
@@ -89,9 +92,11 @@ const ImprovedDistributionChart = ({ fractionData }) => {
         <p className="font-bold mb-1">{label}</p>
         <p className="text-sm">Échantillon : <b>{ech.toFixed(2)}%</b></p>
         <p className="text-sm">Min/Max : <b>{min.toFixed(2)} – {max.toFixed(2)}%</b></p>
-        <p className={inRange? 'text-green-600':'text-red-600'}>{inRange? '✓ Dans plage':'✗ Hors plage'}</p>
+        <p className={inRange ? 'text-green-600' : 'text-red-600'}>
+          {inRange ? '✓ Dans plage' : '✗ Hors plage'}
+        </p>
         {ecart && <p className="text-red-600 text-sm">{ecart}</p>}
-        <p className="text-sm" style={{color:col}}>Confiance : {conf}</p>
+        <p className="text-sm" style={{ color: col }}>Confiance : {conf}</p>
       </div>
     );
   };
@@ -116,7 +121,7 @@ const ImprovedDistributionChart = ({ fractionData }) => {
       await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
       alert('Image copiée!');
     } catch {
-      alert('Utilisez clic-droit → Copier l'image.');
+      alert('Utilisez clic-droit → Copier l\'image.');
     }
   };
 
@@ -130,10 +135,10 @@ const ImprovedDistributionChart = ({ fractionData }) => {
 
         <div ref={chartRef} className="h-80">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top:20,right:20,left:20, bottom:5 }}>
+            <ComposedChart data={chartData} margin={{ top: 20, right: 20, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" tick={customXAxisTick} interval={0} />
-              <YAxis domain={[0,70]} label={{value:'%',angle:-90,position:'insideLeft'}} />
+              <YAxis domain={[0, 70]} label={{ value: '%', angle: -90, position: 'insideLeft' }} />
               <Tooltip content={<CustomTooltip />} />
 
               <Line type="monotone" dataKey="min_conf_70" stroke="#f97316" strokeOpacity={0.3} dot={emptyDot} />
@@ -147,7 +152,7 @@ const ImprovedDistributionChart = ({ fractionData }) => {
 
               <Line type="monotone" dataKey="min" stroke="#000" strokeDasharray="4 4" dot={thresholdDot} />
               <Line type="monotone" dataKey="max" stroke="#000" strokeDasharray="4 4" dot={thresholdDot} />
-              <Line type="monotone" dataKey="échantillon" stroke="#3b82f6" strokeWidth={2.5} dot={customDot} activeDot={{r:8}} />
+              <Line type="monotone" dataKey="échantillon" stroke="#3b82f6" strokeWidth={2.5} dot={thresholdDot} activeDot={{ r: 8 }} />
               <Legend />
             </ComposedChart>
           </ResponsiveContainer>
@@ -167,12 +172,15 @@ const ImprovedDistributionChart = ({ fractionData }) => {
       {modalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
           <div className="bg-white p-4 rounded shadow-lg max-w-lg w-full">
-            <button onClick={()=>setModalOpen(false)} className="float-right">✕</button>
-            {imgDataUrl
-              ? <><img src={imgDataUrl} className="w-full mb-2 border" />
-                  <button onClick={handleCopy} className="bg-blue-600 text-white px-3 py-1 rounded">Copier</button>
-                </>
-              : <p>Génération…</p>}
+            <button onClick={() => setModalOpen(false)} className="float-right">✕</button>
+            {imgDataUrl ? (
+              <>
+                <img src={imgDataUrl} className="w-full mb-2 border" />
+                <button onClick={handleCopy} className="bg-blue-600 text-white px-3 py-1 rounded">Copier</button>
+              </>
+            ) : (
+              <p>Génération…</p>
+            )}
           </div>
         </div>
       )}
