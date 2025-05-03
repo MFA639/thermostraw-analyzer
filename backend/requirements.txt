@@ -22,3 +22,4 @@ threadpoolctl==3.6.0
 typing-extensions==4.13.2
 tzdata==2025.2
 uvicorn==0.34.2
+matplotlib>=3.8
