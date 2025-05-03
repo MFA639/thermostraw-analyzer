@@ -51,6 +51,20 @@ class PredictionResult(BaseModel):
     status: str
     optimal_ranges: Dict[str, List[float]]
 
+# NOUVELLE FONCTION : Normalisation des clés
+def create_consistent_key(fractions_dict):
+    """
+    Crée une clé cohérente en forçant les valeurs à être des flottants avec une décimale
+    Cette fonction garantit que les clés sont toujours formatées de la même manière,
+    évitant les problèmes de correspondance entre '15' et '15.0'
+    """
+    key_parts = []
+    for k, v in sorted(fractions_dict.items()):  # Tri pour garantir l'ordre
+        # Forcer le format avec une décimale
+        formatted_value = f"{float(v):.1f}"
+        key_parts.append(f"{k}_{formatted_value}")
+    return "_".join(key_parts)
+
 @app.get("/")
 def read_root():
     return {"message": "Bienvenue sur l'API ThermoStraw Analyzer"}
@@ -97,30 +111,59 @@ def predict_conductivity(fractions: GranulometricFractions):
 def save_chart_image(request: ChartImageRequest):
     """
     Reçoit et stocke l'image du graphique capturée par le frontend
+    Utilise maintenant une clé normalisée pour éviter les problèmes de format
     """
     try:
-        # Créer une clé unique pour cette combinaison de fractions
         fractions = request.fractions.dict()
-        fractions_key = "_".join([f"{k}_{v}" for k, v in fractions.items()])
+        # MODIFICATION : Utilisation de la fonction de création de clé cohérente
+        fractions_key = create_consistent_key(fractions)
         
-        # Stocker l'image
+        # Logs pour débogage
+        print(f"Stockage de l'image avec la clé normalisée: {fractions_key}")
+        print(f"Taille de l'image reçue: {len(request.chart_image)} caractères")
+        
+        # Stocker l'image avec la clé normalisée
         chart_images[fractions_key] = request.chart_image
+        
+        print(f"Nombre total d'images stockées: {len(chart_images)}")
+        print(f"Clés actuellement stockées: {list(chart_images.keys())}")
         
         return {"message": "Image enregistrée avec succès", "key": fractions_key}
     
     except Exception as e:
+        print(f"Erreur lors de l'enregistrement de l'image: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erreur lors de l'enregistrement de l'image: {str(e)}")
 
 @app.post("/predict-image")
 def predict_image(fractions: GranulometricFractions):
     """
     Prédit la conductivité thermique et renvoie l'image du graphique pour Google Sheets
+    Utilise la même fonction de normalisation pour retrouver l'image
     """
     try:
         # Vérification que les fractions sont positives
         for fraction_name, value in fractions.dict().items():
             if value < 0:
                 raise HTTPException(status_code=400, detail=f"La fraction {fraction_name} ne peut pas être négative")
+        
+        fractions_dict = fractions.dict()
+        # MODIFICATION : Utilisation de la même fonction de création de clé
+        fractions_key = create_consistent_key(fractions_dict)
+        
+        # Logs détaillés pour débogage
+        print(f"Recherche de l'image avec la clé normalisée: {fractions_key}")
+        print(f"Nombre d'images actuellement stockées: {len(chart_images)}")
+        print(f"Clés disponibles: {list(chart_images.keys())}")
+        
+        # Récupérer l'image avec la clé normalisée
+        chart_image = chart_images.get(fractions_key, "")
+        
+        if chart_image:
+            print(f"Image trouvée, taille: {len(chart_image)} caractères")
+        else:
+            print("Aucune image trouvée pour cette clé")
+            print(f"Clé recherchée: {fractions_key}")
+            print(f"Clés disponibles: {list(chart_images.keys())}")
         
         # Prédiction
         result = predictor.predict(
@@ -130,13 +173,6 @@ def predict_image(fractions: GranulometricFractions):
             fractions.taux_250um,
             fractions.taux_0
         )
-        
-        # Créer une clé unique pour cette combinaison de fractions
-        fractions_dict = fractions.dict()
-        fractions_key = "_".join([f"{k}_{v}" for k, v in fractions_dict.items()])
-        
-        # Récupérer l'image si elle existe
-        chart_image = chart_images.get(fractions_key, "")
         
         # Enregistrement de la mesure dans l'historique
         measurements_history.append({
@@ -160,6 +196,7 @@ def predict_image(fractions: GranulometricFractions):
         raise HTTPException(status_code=400, detail=str(e))
     
     except Exception as e:
+        print(f"Erreur dans predict-image: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erreur de prédiction: {str(e)}")
 
 @app.post("/add-laboratory-sample")
