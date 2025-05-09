@@ -181,13 +181,22 @@ function App() {
     console.log('Soumission des fractions:', fractions);
     
     try {
-      const response = await axios.post(`${API_URL}/predict`, fractions);
+      // MODIFICATION: Utiliser predict-image au lieu de predict
+      const response = await axios.post(`${API_URL}/predict-image`, fractions);
       console.log('Réponse de prédiction reçue:', response.data);
       
       setPrediction(response.data);
       
-      // Mise à jour des données pour le graphique
-      setFractionData(formatFractionData(fractions, response.data.optimal_ranges));
+      // Mise à jour des données pour le graphique avec des plages optimales par défaut si elles sont manquantes
+      const optimalRanges = response.data.optimal_ranges || {
+        taux_2mm: [12, 18],
+        taux_1mm: [53, 58],
+        taux_500um: [19, 24],
+        taux_250um: [4, 7],
+        taux_0: [0, 1]
+      };
+      
+      setFractionData(formatFractionData(fractions, optimalRanges));
       
       // Si en mode auto, capturer et envoyer l'image après rendu du graphique
       if (autoMode) {
