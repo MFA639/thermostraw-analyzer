@@ -60,6 +60,20 @@ const PredictionSummary = ({ prediction, inputData }) => {
   const handleCopyAsImage = async () => {
     try {
       const element = summaryRef.current;
+      
+      // Attendre que toutes les images soient chargées
+      const images = element.querySelectorAll('img');
+      await Promise.all(Array.from(images).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(resolve => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      }));
+      
+      // Petit délai pour s'assurer que le rendering est terminé
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       const canvas = await html2canvas(element, {
         backgroundColor: '#ffffff',
         scale: 2,
@@ -69,7 +83,8 @@ const PredictionSummary = ({ prediction, inputData }) => {
         allowTaint: true,
         logging: false,
         scrollX: 0,
-        scrollY: 0
+        scrollY: 0,
+        foreignObjectRendering: true
       });
       
       canvas.toBlob(async (blob) => {
@@ -110,7 +125,7 @@ const PredictionSummary = ({ prediction, inputData }) => {
       </div>
       
       {/* Contenu à capturer pour l'image */}
-      <div ref={summaryRef} className="p-6 space-y-6" style={{ backgroundColor: '#ffffff' }}>
+      <div ref={summaryRef} className="p-6 bg-white space-y-6" style={{ backgroundColor: '#ffffff', maxWidth: '800px' }}>
         {/* En-tête du rapport */}
         <div className="text-center border-b pb-4">
           <h1 className="text-2xl font-bold text-blue-700">RAPPORT D'ANALYSE</h1>
@@ -118,119 +133,128 @@ const PredictionSummary = ({ prediction, inputData }) => {
           <p className="text-sm text-gray-500 mt-2">Modèle GP V4-BEST avec indicateur EE_best</p>
         </div>
 
-        {/* Informations générales */}
-        <div className="space-y-3">
-          <h3 className="text-lg font-medium text-gray-700 flex items-center border-b pb-2">
-            <Calendar className="mr-2" size={16} />
-            Informations générales
-          </h3>
-          <div className="grid grid-cols-1 gap-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Numéro de lot :</span>
-              <span className="font-medium">{batchNumber}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Date et heure :</span>
-              <span className="font-medium">{formatDateTime(timestamp)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Modèle utilisé :</span>
-              <span className="font-medium">GP V4-BEST</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Seuil de conformité :</span>
-              <span className="font-medium">{threshold.toFixed(3)} W/m·K</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Distribution granulométrique */}
-        <div className="space-y-3">
-          <h3 className="text-lg font-medium text-gray-700 border-b pb-2">Distribution granulométrique</h3>
-          <div className="grid grid-cols-1 gap-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">{"> 2mm :"}</span>
-              <span className="font-medium">{(inputData.taux_2mm || 0).toFixed(2)}%</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">{"1-2mm :"}</span>
-              <span className="font-medium">{(inputData.taux_1mm || 0).toFixed(2)}%</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">{"500μm-1mm :"}</span>
-              <span className="font-medium">{(inputData.taux_500um || 0).toFixed(2)}%</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">{"250-500μm :"}</span>
-              <span className="font-medium">{(inputData.taux_250um || 0).toFixed(2)}%</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">{"< 250μm :"}</span>
-              <span className="font-medium">{(inputData.taux_0 || 0).toFixed(2)}%</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Résultats de prédiction */}
-        <div className="space-y-3">
-          <h3 className="text-lg font-medium text-gray-700 flex items-center border-b pb-2">
-            <TrendingUp className="mr-2" size={16} />
-            Résultats de prédiction
-          </h3>
-          <div className={`p-4 rounded-lg border ${statusInfo.bg} ${statusInfo.border}`}>
+        {/* Contenu principal en deux colonnes */}
+        <div className="grid grid-cols-2 gap-6">
+          {/* Colonne gauche */}
+          <div className="space-y-6">
+            {/* Informations générales */}
             <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-700 font-medium">Conductivité thermique :</span>
-                <span className="text-xl font-bold text-gray-800">
-                  {lambda_predicted.toFixed(4)} W/m·K
-                </span>
-              </div>
-              {confidence_interval > 0 && (
+              <h3 className="text-lg font-medium text-gray-700 flex items-center border-b pb-2">
+                <Calendar className="mr-2" size={16} />
+                Informations générales
+              </h3>
+              <div className="grid grid-cols-1 gap-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600 text-sm">Incertitude (90% IC) :</span>
-                  <span className="font-medium text-sm">±{confidence_interval_90.toFixed(4)} W/m·K</span>
+                  <span className="text-gray-600">Numéro de lot :</span>
+                  <span className="font-medium">{batchNumber}</span>
                 </div>
-              )}
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">Statut :</span>
-                <span className={`font-bold ${statusInfo.color}`}>{statusInfo.text}</span>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Date et heure :</span>
+                  <span className="font-medium">{formatDateTime(timestamp)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Modèle utilisé :</span>
+                  <span className="font-medium">GP V4-BEST</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Seuil de conformité :</span>
+                  <span className="font-medium">{threshold.toFixed(3)} W/m·K</span>
+                </div>
               </div>
-              <div className="text-xs text-gray-500">
-                {isConforme 
-                  ? `✓ Valeur inférieure au seuil de ${threshold.toFixed(3)} W/m·K`
-                  : `✗ Valeur supérieure au seuil de ${threshold.toFixed(3)} W/m·K`
-                }
+            </div>
+
+            {/* Distribution granulométrique */}
+            <div className="space-y-3">
+              <h3 className="text-lg font-medium text-gray-700 border-b pb-2">Distribution granulométrique</h3>
+              <div className="grid grid-cols-1 gap-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">{"> 2mm :"}</span>
+                  <span className="font-medium">{(inputData.taux_2mm || 0).toFixed(2)}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">{"1-2mm :"}</span>
+                  <span className="font-medium">{(inputData.taux_1mm || 0).toFixed(2)}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">{"500μm-1mm :"}</span>
+                  <span className="font-medium">{(inputData.taux_500um || 0).toFixed(2)}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">{"250-500μm :"}</span>
+                  <span className="font-medium">{(inputData.taux_250um || 0).toFixed(2)}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">{"< 250μm :"}</span>
+                  <span className="font-medium">{(inputData.taux_0 || 0).toFixed(2)}%</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Graphique de validation du modèle */}
-        <div className="space-y-3">
-          <h3 className="text-lg font-medium text-gray-700 border-b pb-2">Validation du modèle</h3>
-          <div className="flex justify-center bg-gray-50 p-4 rounded-lg">
-            <div className="text-center">
-              <div className="bg-white border border-gray-200 rounded-md overflow-hidden inline-block">
-                <img 
-                  src="/validation-graph.png" 
-                  alt="Graphique de validation du modèle GP V4-BEST"
-                  className="max-w-full h-auto"
-                  style={{ maxHeight: '300px' }}
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                    e.target.nextSibling.style.display = 'block';
-                  }}
-                />
-                <div 
-                  style={{ display: 'none' }}
-                  className="w-96 h-64 bg-gray-100 border border-gray-200 rounded-md flex items-center justify-center text-gray-500"
-                >
-                  Graphique de validation non disponible
+          {/* Colonne droite */}
+          <div className="space-y-6">
+            {/* Résultats de prédiction */}
+            <div className="space-y-3">
+              <h3 className="text-lg font-medium text-gray-700 flex items-center border-b pb-2">
+                <TrendingUp className="mr-2" size={16} />
+                Résultats de prédiction
+              </h3>
+              <div className={`p-4 rounded-lg border ${statusInfo.bg} ${statusInfo.border}`}>
+                <div className="space-y-3">
+                  <div className="text-center">
+                    <span className="text-gray-700 font-medium">Conductivité thermique :</span>
+                    <div className="text-2xl font-bold text-gray-800 mt-1">
+                      {lambda_predicted.toFixed(4)} W/m·K
+                    </div>
+                  </div>
+                  {confidence_interval > 0 && (
+                    <div className="text-center">
+                      <span className="text-gray-600 text-sm">Incertitude (90% IC) :</span>
+                      <div className="font-medium text-sm">±{confidence_interval_90.toFixed(4)} W/m·K</div>
+                    </div>
+                  )}
+                  <div className="text-center">
+                    <span className="text-gray-600">Statut :</span>
+                    <div className={`font-bold ${statusInfo.color} text-lg`}>{statusInfo.text}</div>
+                  </div>
+                  <div className="text-xs text-gray-500 text-center">
+                    {isConforme 
+                      ? `✓ Valeur inférieure au seuil de ${threshold.toFixed(3)} W/m·K`
+                      : `✗ Valeur supérieure au seuil de ${threshold.toFixed(3)} W/m·K`
+                    }
+                  </div>
                 </div>
               </div>
-              <p className="text-xs text-gray-600 mt-2">
-                Validation croisée : prédiction vs mesures réelles
-              </p>
+            </div>
+
+            {/* Graphique de validation du modèle */}
+            <div className="space-y-3">
+              <h3 className="text-lg font-medium text-gray-700 border-b pb-2">Validation du modèle</h3>
+              <div className="flex justify-center">
+                <div className="text-center">
+                  <div className="bg-white border border-gray-200 rounded-md overflow-hidden inline-block">
+                    <img 
+                      src="/validation-graph.png" 
+                      alt="Graphique de validation du modèle GP V4-BEST"
+                      className="max-w-full h-auto"
+                      style={{ maxHeight: '200px', maxWidth: '300px' }}
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'block';
+                      }}
+                    />
+                    <div 
+                      style={{ display: 'none' }}
+                      className="w-72 h-48 bg-gray-100 border border-gray-200 rounded-md flex items-center justify-center text-gray-500 text-sm"
+                    >
+                      Graphique de validation non disponible
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-2">
+                    Validation croisée : prédiction vs mesures réelles
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

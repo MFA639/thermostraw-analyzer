@@ -14,7 +14,8 @@ class ThermalConductivityPredictor:
         Initialise le modèle avec les paramètres optimisés du rapport de recherche
         """
         # Définition du noyau RBF avec longueurs caractéristiques spécifiques
-        self.kernel = RBF([0.4, 0.4, 1.0]) + WhiteKernel(1e-4, noise_level_bounds="fixed")
+        # Augmentation du WhiteKernel pour une meilleure estimation d'incertitude
+        self.kernel = RBF([0.4, 0.4, 1.0]) + WhiteKernel(1e-3, noise_level_bounds="fixed")
         
         # Création du modèle GP
         self.model = GaussianProcessRegressor(
@@ -124,14 +125,23 @@ class ThermalConductivityPredictor:
         # Prédiction avec le modèle GP
         lambda_pred, std = self.model.predict(X_pred, return_std=True)
         
+        # Debug: Affichage des valeurs pour diagnostic
+        print(f"DEBUG - std brut: {std}")
+        print(f"DEBUG - std[0]: {std[0] if len(std) > 0 else 'vide'}")
+        print(f"DEBUG - lambda_pred: {lambda_pred[0]}")
+        
         # Calcul de l'intervalle de confiance à 90% (1.645 au lieu de 1.96 pour 95%)
-        confidence_interval = 1.645 * std[0] if len(std) > 0 and std[0] > 0 else 0.0
+        # Assurer une incertitude minimale si trop faible
+        raw_std = std[0] if len(std) > 0 else 0.0
+        confidence_interval = max(1.645 * raw_std, 0.0001)  # Minimum 0.0001 pour éviter 0.0000
         
         # Seuil de conformité
         threshold = 0.045
         
         # Détermination du statut simplifié : conforme ou non conforme
         status = "conforme" if lambda_pred[0] <= threshold else "non_conforme"
+        
+        print(f"DEBUG - confidence_interval final: {confidence_interval}")
         
         return {
             "lambda_predicted": float(lambda_pred[0]),
