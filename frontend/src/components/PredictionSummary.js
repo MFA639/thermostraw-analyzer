@@ -77,7 +77,7 @@ const PredictionSummary = ({ prediction, inputData }) => {
       
       const canvas = await html2canvas(element, {
         backgroundColor: '#ffffff',
-        scale: 1.5,
+        scale: 1,
         useCORS: false,
         allowTaint: false,
         logging: false,
