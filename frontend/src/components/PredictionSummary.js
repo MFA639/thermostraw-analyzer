@@ -165,7 +165,7 @@ const PredictionSummary = ({ prediction, inputData }) => {
         {/* En-tête du rapport */}
         <div className="text-center border-b border-gray-300 pb-4 mb-6">
           <h1 className="text-2xl font-bold text-blue-700">RAPPORT D'ANALYSE</h1>
-          <h2 className="text-xl font-semibold text-gray-700">THERMOSTRAW ANALYZER</h2>
+          <h2 className="text-xl font-semibold text-gray-700">Prédiction de la conductivité à partir des fractions granulométriques</h2>
           <p className="text-sm text-gray-500 mt-2">Modèle GP V4-BEST avec indicateur EE_best</p>
         </div>
 

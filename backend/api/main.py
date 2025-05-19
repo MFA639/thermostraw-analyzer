@@ -6,7 +6,7 @@ import numpy as np
 import sys, os
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from models.gaussian_process import ThermalConductivityPredictor
+from backend.models.gaussian_process_archive import ThermalConductivityPredictor
 
 app = FastAPI(title="ThermoStraw Analyzer API")
 
@@ -17,6 +17,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Configuration globale
+ADMIN_PIN = "1234"  # Changez ce PIN pour la sécurité
+CURRENT_THRESHOLD = 0.045  # Seuil initial
 
 predictor = ThermalConductivityPredictor()
 measurements_history: List[dict] = []
@@ -40,10 +44,49 @@ class LaboratoryMeasurement(BaseModel):
     fractions: GranulometricFractions
     lambda_value: float
 
+class PinVerificationRequest(BaseModel):
+    pin: str
+
+class ThresholdUpdateRequest(BaseModel):
+    pin: str
+    threshold: float
+
 # ---------- Endpoints ----------
 @app.get("/")
 def root():
     return {"message": "ThermoStraw API running"}
+
+@app.get("/current-threshold")
+def get_current_threshold():
+    """Récupère le seuil actuel"""
+    return {"threshold": CURRENT_THRESHOLD}
+
+@app.post("/verify-pin")
+def verify_pin(request: PinVerificationRequest):
+    """Vérifie le PIN administrateur"""
+    return {"valid": request.pin == ADMIN_PIN}
+
+@app.post("/update-threshold")
+def update_threshold(request: ThresholdUpdateRequest):
+    """Met à jour le seuil de conformité (protégé par PIN)"""
+    global CURRENT_THRESHOLD
+    
+    # Vérification du PIN
+    if request.pin != ADMIN_PIN:
+        raise HTTPException(status_code=403, detail="PIN incorrect")
+    
+    # Validation du seuil
+    if request.threshold <= 0 or request.threshold > 0.1:
+        raise HTTPException(status_code=400, detail="Seuil invalide (doit être entre 0.001 et 0.1)")
+    
+    # Mise à jour du seuil
+    CURRENT_THRESHOLD = request.threshold
+    
+    return {
+        "success": True,
+        "new_threshold": CURRENT_THRESHOLD,
+        "message": f"Seuil mis à jour à {CURRENT_THRESHOLD:.3f} W/m·K"
+    }
 
 @app.post("/save-chart-image")
 def save_chart(req: ChartImageRequest):
@@ -61,21 +104,29 @@ def predict_image(fracs: GranulometricFractions):
         # Calculer la prédiction
         res = predictor.predict(**fracs.dict())
         
+        # Appliquer le seuil global pour déterminer le statut
+        lambda_pred = res["lambda_predicted"]
+        status = "conforme" if lambda_pred <= CURRENT_THRESHOLD else "non_conforme"
+        
         # Ajouter à l'historique
         measurements_history.append({
             "fractions": fracs.dict(),
-            "prediction": {"lambda_predicted": res["lambda_predicted"],
-                           "status": res["status"]},
+            "prediction": {
+                "lambda_predicted": lambda_pred,
+                "status": status,
+                "threshold_used": CURRENT_THRESHOLD
+            },
             "timestamp": float(np.datetime64("now").astype("float64"))
         })
         
         # Renvoyer les données de prédiction + l'image
         return {
-            "lambda_predicted": res["lambda_predicted"],
+            "lambda_predicted": lambda_pred,
             "confidence_interval": res["confidence_interval"],
-            "status": res["status"],
+            "status": status,  # Utiliser le statut basé sur le seuil global
             "r1p_log": res.get("r1p_log"),
             "ee_best": res.get("ee_best"),
+            "threshold": CURRENT_THRESHOLD,  # Inclure le seuil utilisé
             "optimal_ranges": res.get("optimal_ranges", {
                 "taux_2mm": [12, 18],
                 "taux_1mm": [53, 58],
@@ -94,3 +145,15 @@ def add_sample(m: LaboratoryMeasurement):
         return predictor.add_sample(**m.fractions.dict(), lambda_value=m.lambda_value)
     except Exception as e:
         raise HTTPException(500, f"Erreur add-sample: {e}")
+
+@app.get("/admin/history")
+def get_measurements_history(pin: str):
+    """Récupère l'historique des mesures (protégé par PIN)"""
+    if pin != ADMIN_PIN:
+        raise HTTPException(status_code=403, detail="PIN incorrect")
+    
+    return {
+        "measurements": measurements_history,
+        "count": len(measurements_history),
+        "current_threshold": CURRENT_THRESHOLD
+    }

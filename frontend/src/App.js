@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import FractionInputForm from './components/FractionInputForm';
 import PredictionSummary from './components/PredictionSummary';
+import ThresholdConfig from './components/ThresholdConfig';
 import './App.css';
 
 function App() {
@@ -9,8 +10,31 @@ function App() {
   const [inputData, setInputData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [currentThreshold, setCurrentThreshold] = useState(0.045);
   
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+  
+  // Charger le seuil actuel au démarrage
+  useEffect(() => {
+    const fetchCurrentThreshold = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/current-threshold`);
+        setCurrentThreshold(response.data.threshold);
+      } catch (err) {
+        console.error('Erreur lors du chargement du seuil:', err);
+      }
+    };
+    
+    fetchCurrentThreshold();
+  }, [API_URL]);
+  
+  const handleThresholdUpdate = (newThreshold) => {
+    setCurrentThreshold(newThreshold);
+    // Si une prédiction est affichée, la rafraîchir avec le nouveau seuil
+    if (prediction && inputData) {
+      handleSubmit(inputData);
+    }
+  };
   
   const handleSubmit = async (data) => {
     console.log('=== DÉBUT DE LA PRÉDICTION ===');
@@ -43,6 +67,10 @@ function App() {
       }
       
       setPrediction(response.data);
+      // Mettre à jour le seuil local si différent
+      if (response.data.threshold && response.data.threshold !== currentThreshold) {
+        setCurrentThreshold(response.data.threshold);
+      }
       console.log('=== PRÉDICTION RÉUSSIE ===');
       
     } catch (err) {
@@ -75,8 +103,16 @@ function App() {
       {/* En-tête */}
       <header className="bg-blue-700 text-white p-4 shadow-md">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-2xl font-bold">ThermoStraw Analyzer</h1>
-          <p className="text-sm opacity-90">Modèle GP V4-BEST avec indicateur EE_best</p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold">ThermoStraw Analyzer</h1>
+              <p className="text-sm opacity-90">Modèle GP V4-BEST avec indicateur EE_best</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm opacity-90">Seuil de conformité</p>
+              <p className="text-lg font-semibold">{currentThreshold.toFixed(3)} W/m·K</p>
+            </div>
+          </div>
         </div>
       </header>
       
@@ -119,6 +155,12 @@ function App() {
           </div>
         </div>
       </div>
+      
+      {/* Composant de configuration du seuil */}
+      <ThresholdConfig 
+        currentThreshold={currentThreshold}
+        onThresholdUpdate={handleThresholdUpdate}
+      />
     </div>
   );
 }
