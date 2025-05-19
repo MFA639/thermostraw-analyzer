@@ -58,21 +58,32 @@ def save_chart(req: ChartImageRequest):
 @app.post("/predict-image")
 def predict_image(fracs: GranulometricFractions):
     try:
-        if chart_image_last is None:
-            return {"chart_image": ""}   # aucun PNG dispo
-
+        # Calculer la prédiction
         res = predictor.predict(**fracs.dict())
+        
+        # Ajouter à l'historique
         measurements_history.append({
             "fractions": fracs.dict(),
             "prediction": {"lambda_predicted": res["lambda_predicted"],
                            "status": res["status"]},
             "timestamp": float(np.datetime64("now").astype("float64"))
         })
+        
+        # Renvoyer les données de prédiction + l'image
         return {
             "lambda_predicted": res["lambda_predicted"],
             "confidence_interval": res["confidence_interval"],
             "status": res["status"],
-            "chart_image": "data:image/png;base64," + chart_image_last
+            "r1p_log": res.get("r1p_log"),
+            "ee_best": res.get("ee_best"),
+            "optimal_ranges": res.get("optimal_ranges", {
+                "taux_2mm": [12, 18],
+                "taux_1mm": [53, 58],
+                "taux_500um": [19, 24],
+                "taux_250um": [4, 7],
+                "taux_0": [0, 1]
+            }),
+            "chart_image": "data:image/png;base64," + chart_image_last if chart_image_last else ""
         }
     except Exception as e:
         raise HTTPException(500, f"Erreur predict-image: {e}")

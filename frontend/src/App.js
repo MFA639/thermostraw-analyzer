@@ -13,29 +13,58 @@ function App() {
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
   
   const handleSubmit = async (data) => {
+    console.log('=== DÉBUT DE LA PRÉDICTION ===');
+    console.log('Données reçues:', data);
+    
     setLoading(true);
     setError('');
+    setPrediction(null); // Reset previous prediction
     setInputData(data); // Sauvegarder les données saisies
-    
-    console.log('Soumission des données:', data);
     
     try {
       // Extraire seulement les fractions pour l'API
       const fractions = {
-        taux_2mm: data.taux_2mm,
-        taux_1mm: data.taux_1mm,
-        taux_500um: data.taux_500um,
-        taux_250um: data.taux_250um,
-        taux_0: data.taux_0
+        taux_2mm: parseFloat(data.taux_2mm) || 0,
+        taux_1mm: parseFloat(data.taux_1mm) || 0,
+        taux_500um: parseFloat(data.taux_500um) || 0,
+        taux_250um: parseFloat(data.taux_250um) || 0,
+        taux_0: parseFloat(data.taux_0) || 0
       };
       
+      console.log('Fractions envoyées à l\'API:', fractions);
+      console.log('URL de l\'API:', `${API_URL}/predict-image`);
+      
       const response = await axios.post(`${API_URL}/predict-image`, fractions);
-      console.log('Réponse de prédiction reçue:', response.data);
+      console.log('Réponse reçue:', response.data);
+      
+      // Vérifier que la réponse contient les données attendues
+      if (!response.data || typeof response.data.lambda_predicted === 'undefined') {
+        throw new Error('Réponse invalide du serveur: données manquantes');
+      }
       
       setPrediction(response.data);
+      console.log('=== PRÉDICTION RÉUSSIE ===');
+      
     } catch (err) {
-      console.error('Erreur de prédiction:', err);
-      setError(err.response?.data?.detail || 'Erreur lors de la prédiction. Vérifiez que le serveur est démarré.');
+      console.error('=== ERREUR DE PRÉDICTION ===');
+      console.error('Erreur complète:', err);
+      console.error('Réponse du serveur:', err.response?.data);
+      console.error('Statut HTTP:', err.response?.status);
+      
+      let errorMessage = 'Erreur inconnue lors de la prédiction';
+      
+      if (err.response) {
+        // Erreur HTTP du serveur
+        errorMessage = `Erreur serveur (${err.response.status}): ${err.response.data?.detail || err.response.statusText}`;
+      } else if (err.request) {
+        // Pas de réponse du serveur
+        errorMessage = 'Impossible de contacter le serveur. Vérifiez que le backend est démarré.';
+      } else {
+        // Autre erreur
+        errorMessage = err.message || 'Erreur lors de la préparation de la requête';
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -61,14 +90,27 @@ function App() {
             {error && (
               <div className="mt-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
                 <strong className="font-bold">Erreur!</strong>
-                <span className="block sm:inline"> {error}</span>
+                <div className="text-sm mt-1">{error}</div>
+              </div>
+            )}
+            
+            {/* Indicateur de chargement */}
+            {loading && (
+              <div className="mt-4 bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">
+                <div className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Prédiction en cours...
+                </div>
               </div>
             )}
           </div>
           
           {/* Résumé de prédiction */}
           <div>
-            {prediction && inputData && (
+            {prediction && inputData && !loading && (
               <PredictionSummary 
                 prediction={prediction} 
                 inputData={inputData}
@@ -98,14 +140,14 @@ function App() {
             </div>
             <div>
               <h3 className="text-lg font-semibold mb-2">Validation du modèle</h3>
-              <img 
-                src="/validation-graph.png" 
-                alt="Graphique de validation GP V4-BEST" 
-                className="w-full rounded-md border border-gray-200"
-              />
-              <p className="text-xs text-gray-600 mt-2 text-center">
-                Validation du modèle GP V4-BEST: prédiction vs mesures réelles
-              </p>
+              <div className="text-center">
+                <div className="w-full h-48 bg-gray-100 rounded-md border border-gray-200 flex items-center justify-center">
+                  <span className="text-gray-500">Graphique de validation du modèle</span>
+                </div>
+                <p className="text-xs text-gray-600 mt-2">
+                  Validation du modèle GP V4-BEST: prédiction vs mesures réelles
+                </p>
+              </div>
             </div>
           </div>
         </div>

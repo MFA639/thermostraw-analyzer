@@ -4,20 +4,33 @@ import { Copy, Check, Calendar, Beaker, BarChart3, TrendingUp } from 'lucide-rea
 const PredictionSummary = ({ prediction, inputData }) => {
   const [copied, setCopied] = useState(false);
   
-  // Formater la date et l'heure
+  // Vérifications de sécurité
+  if (!prediction || !inputData) {
+    return (
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <p className="text-gray-500">Aucune prédiction disponible</p>
+      </div>
+    );
+  }
+
+  // Formater la date et l'heure avec gestion d'erreur
   const formatDateTime = (isoString) => {
-    const date = new Date(isoString);
-    return date.toLocaleString('fr-FR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
+    try {
+      const date = new Date(isoString);
+      return date.toLocaleString('fr-FR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    } catch (error) {
+      return new Date().toLocaleString('fr-FR');
+    }
   };
 
-  // Déterminer le statut et la couleur
+  // Déterminer le statut et la couleur avec valeur par défaut
   const getStatusInfo = (status) => {
     switch (status) {
       case 'green':
@@ -33,28 +46,45 @@ const PredictionSummary = ({ prediction, inputData }) => {
 
   const statusInfo = getStatusInfo(prediction.status);
 
-  // Créer le texte à copier
+  // Valeurs par défaut pour éviter les erreurs
+  const lambda_predicted = prediction.lambda_predicted || 0;
+  const confidence_interval = prediction.confidence_interval || 0;
+  const batchNumber = inputData.batchNumber || 'Non spécifié';
+  const timestamp = inputData.timestamp || new Date().toISOString();
+
+  // Créer le texte à copier avec gestion d'erreur
   const createCopyText = () => {
-    const text = `RAPPORT D'ANALYSE THERMOSTRAW ANALYZER
-    
+    try {
+      const fractionValues = {
+        taux_2mm: inputData.taux_2mm || 0,
+        taux_1mm: inputData.taux_1mm || 0,
+        taux_500um: inputData.taux_500um || 0,
+        taux_250um: inputData.taux_250um || 0,
+        taux_0: inputData.taux_0 || 0
+      };
+
+      const total = Object.values(fractionValues).reduce((sum, val) => sum + val, 0);
+
+      const text = `RAPPORT D'ANALYSE THERMOSTRAW ANALYZER
+      
 ═══════════════════════════════════════
 
 INFORMATIONS GÉNÉRALES
-- Numéro de lot : ${inputData.batchNumber}
-- Date et heure : ${formatDateTime(inputData.timestamp)}
+- Numéro de lot : ${batchNumber}
+- Date et heure : ${formatDateTime(timestamp)}
 - Modèle utilisé : GP V4-BEST avec indicateur EE_best
 
 DISTRIBUTION GRANULOMÉTRIQUE
-- > 2mm : ${inputData.taux_2mm.toFixed(2)}%
-- 1-2mm : ${inputData.taux_1mm.toFixed(2)}%
-- 500μm-1mm : ${inputData.taux_500um.toFixed(2)}%
-- 250-500μm : ${inputData.taux_250um.toFixed(2)}%
-- < 250μm : ${inputData.taux_0.toFixed(2)}%
-- Total : ${Object.values(inputData).filter(v => typeof v === 'number').reduce((a, b) => a + b, 0).toFixed(2)}%
+- > 2mm : ${fractionValues.taux_2mm.toFixed(2)}%
+- 1-2mm : ${fractionValues.taux_1mm.toFixed(2)}%
+- 500μm-1mm : ${fractionValues.taux_500um.toFixed(2)}%
+- 250-500μm : ${fractionValues.taux_250um.toFixed(2)}%
+- < 250μm : ${fractionValues.taux_0.toFixed(2)}%
+- Total : ${total.toFixed(2)}%
 
 RÉSULTATS DE PRÉDICTION
-- Conductivité thermique prédite : ${prediction.lambda_predicted.toFixed(4)} W/m·K
-- Incertitude (95% IC) : ±${prediction.confidence_interval.toFixed(4)} W/m·K
+- Conductivité thermique prédite : ${lambda_predicted.toFixed(4)} W/m·K
+- Incertitude (95% IC) : ±${confidence_interval.toFixed(4)} W/m·K
 - Statut : ${statusInfo.text}
 
 PARAMÈTRES DU MODÈLE
@@ -69,7 +99,11 @@ PARAMÈTRES DU MODÈLE
 Rapport généré automatiquement par ThermoStraw Analyzer
 Modèle GP V4-BEST - Validation disponible dans l'interface`;
 
-    return text;
+      return text;
+    } catch (error) {
+      console.error('Erreur lors de la création du texte à copier:', error);
+      return 'Erreur lors de la génération du rapport';
+    }
   };
 
   const handleCopy = async () => {
@@ -79,15 +113,19 @@ Modèle GP V4-BEST - Validation disponible dans l'interface`;
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error('Erreur lors de la copie :', err);
-      // Solution de secours pour les navigateurs sans prise en charge du clipboard
-      const textArea = document.createElement('textarea');
-      textArea.value = createCopyText();
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      // Solution de secours
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = createCopyText();
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (fallbackError) {
+        alert('Impossible de copier automatiquement. Veuillez sélectionner et copier le texte manuellement.');
+      }
     }
   };
 
@@ -110,11 +148,11 @@ Modèle GP V4-BEST - Validation disponible dans l'interface`;
           <div className="grid grid-cols-1 gap-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-600">Numéro de lot :</span>
-              <span className="font-medium">{inputData.batchNumber}</span>
+              <span className="font-medium">{batchNumber}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Date et heure :</span>
-              <span className="font-medium">{formatDateTime(inputData.timestamp)}</span>
+              <span className="font-medium">{formatDateTime(timestamp)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Modèle utilisé :</span>
@@ -129,23 +167,23 @@ Modèle GP V4-BEST - Validation disponible dans l'interface`;
           <div className="grid grid-cols-1 gap-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-600">{"> 2mm :"}</span>
-              <span className="font-medium">{inputData.taux_2mm.toFixed(2)}%</span>
+              <span className="font-medium">{(inputData.taux_2mm || 0).toFixed(2)}%</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">{"1-2mm :"}</span>
-              <span className="font-medium">{inputData.taux_1mm.toFixed(2)}%</span>
+              <span className="font-medium">{(inputData.taux_1mm || 0).toFixed(2)}%</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">{"500μm-1mm :"}</span>
-              <span className="font-medium">{inputData.taux_500um.toFixed(2)}%</span>
+              <span className="font-medium">{(inputData.taux_500um || 0).toFixed(2)}%</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">{"250-500μm :"}</span>
-              <span className="font-medium">{inputData.taux_250um.toFixed(2)}%</span>
+              <span className="font-medium">{(inputData.taux_250um || 0).toFixed(2)}%</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">{"< 250μm :"}</span>
-              <span className="font-medium">{inputData.taux_0.toFixed(2)}%</span>
+              <span className="font-medium">{(inputData.taux_0 || 0).toFixed(2)}%</span>
             </div>
           </div>
         </div>
@@ -161,34 +199,17 @@ Modèle GP V4-BEST - Validation disponible dans l'interface`;
               <div className="flex justify-between items-center">
                 <span className="text-gray-700 font-medium">Conductivité thermique :</span>
                 <span className="text-xl font-bold text-gray-800">
-                  {prediction.lambda_predicted.toFixed(4)} W/m·K
+                  {lambda_predicted.toFixed(4)} W/m·K
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600 text-sm">Incertitude (95% IC) :</span>
-                <span className="font-medium text-sm">±{prediction.confidence_interval.toFixed(4)} W/m·K</span>
+                <span className="font-medium text-sm">±{confidence_interval.toFixed(4)} W/m·K</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Statut :</span>
                 <span className={`font-bold ${statusInfo.color}`}>{statusInfo.text}</span>
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Informations sur le modèle */}
-        <div className="space-y-3">
-          <h3 className="text-lg font-medium text-gray-700 flex items-center">
-            <Beaker className="mr-2" size={16} />
-            Paramètres du modèle
-          </h3>
-          <div className="text-sm bg-gray-50 p-3 rounded-lg">
-            <div className="grid grid-cols-2 gap-2">
-              <span>k500 = 1.83</span>
-              <span>k250 = 3.04</span>
-              <span>c = 0.196</span>
-              <span>dmax = 1.76%</span>
-              <span>α = 0.572</span>
             </div>
           </div>
         </div>
