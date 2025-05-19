@@ -61,31 +61,52 @@ const PredictionSummary = ({ prediction, inputData }) => {
     try {
       const element = summaryRef.current;
       
-      // Attendre que toutes les images soient chargées
-      const images = element.querySelectorAll('img');
-      await Promise.all(Array.from(images).map(img => {
-        if (img.complete) return Promise.resolve();
-        return new Promise(resolve => {
-          img.onload = resolve;
-          img.onerror = resolve;
-        });
-      }));
+      // Assurer que l'élément est visible
+      element.style.display = 'block';
+      element.style.visibility = 'visible';
       
-      // Petit délai pour s'assurer que le rendering est terminé
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Forcer le rendu
+      await new Promise(resolve => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(resolve);
+        });
+      });
+      
+      // Délai supplémentaire pour être sûr
+      await new Promise(resolve => setTimeout(resolve, 100));
       
       const canvas = await html2canvas(element, {
         backgroundColor: '#ffffff',
-        scale: 2,
-        width: element.scrollWidth,
-        height: element.scrollHeight,
-        useCORS: true,
-        allowTaint: true,
+        scale: 1.5,
+        useCORS: false,
+        allowTaint: false,
         logging: false,
+        imageTimeout: 15000,
+        removeContainer: true,
+        foreignObjectRendering: false,
+        width: element.offsetWidth,
+        height: element.offsetHeight,
+        x: 0,
+        y: 0,
         scrollX: 0,
-        scrollY: 0,
-        foreignObjectRendering: true
+        scrollY: 0
       });
+      
+      // Vérifier que le canvas n'est pas vide
+      const ctx = canvas.getContext('2d');
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const pixels = imageData.data;
+      let hasColor = false;
+      for (let i = 0; i < pixels.length; i += 4) {
+        if (pixels[i] !== 255 || pixels[i + 1] !== 255 || pixels[i + 2] !== 255) {
+          hasColor = true;
+          break;
+        }
+      }
+      
+      if (!hasColor) {
+        throw new Error('Image capturée vide ou blanche');
+      }
       
       canvas.toBlob(async (blob) => {
         try {
@@ -111,7 +132,22 @@ const PredictionSummary = ({ prediction, inputData }) => {
       
     } catch (err) {
       console.error('Erreur lors de la copie de l\'image :', err);
-      alert('Impossible de copier l\'image. Veuillez réessayer.');
+      alert(`Impossible de copier l'image: ${err.message}. L'image sera téléchargée à la place.`);
+      
+      // Fallback: essayer une capture simple
+      try {
+        const element = summaryRef.current;
+        const canvas = await html2canvas(element, { backgroundColor: '#ffffff' });
+        const url = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = `thermostraw-rapport-${batchNumber}-${new Date().toISOString().split('T')[0]}.png`;
+        link.href = url;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (fallbackErr) {
+        console.error('Erreur fallback:', fallbackErr);
+      }
     }
   };
 
@@ -125,38 +161,40 @@ const PredictionSummary = ({ prediction, inputData }) => {
       </div>
       
       {/* Contenu à capturer pour l'image */}
-      <div ref={summaryRef} className="p-6 bg-white space-y-6" style={{ backgroundColor: '#ffffff', maxWidth: '800px' }}>
+      <div ref={summaryRef} className="p-6 bg-white" style={{ backgroundColor: '#ffffff', maxWidth: '800px', border: '1px solid #e5e7eb' }}>
         {/* En-tête du rapport */}
-        <div className="text-center border-b pb-4">
+        <div className="text-center border-b border-gray-300 pb-4 mb-6">
           <h1 className="text-2xl font-bold text-blue-700">RAPPORT D'ANALYSE</h1>
           <h2 className="text-xl font-semibold text-gray-700">THERMOSTRAW ANALYZER</h2>
           <p className="text-sm text-gray-500 mt-2">Modèle GP V4-BEST avec indicateur EE_best</p>
         </div>
 
         {/* Contenu principal en deux colonnes */}
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-2 gap-8">
           {/* Colonne gauche */}
           <div className="space-y-6">
             {/* Informations générales */}
             <div className="space-y-3">
-              <h3 className="text-lg font-medium text-gray-700 flex items-center border-b pb-2">
-                <Calendar className="mr-2" size={16} />
-                Informations générales
+              <h3 className="text-lg font-medium text-gray-700 border-b border-gray-300 pb-2">
+                <span className="flex items-center">
+                  <Calendar className="mr-2" size={16} />
+                  Informations générales
+                </span>
               </h3>
-              <div className="grid grid-cols-1 gap-2 text-sm">
-                <div className="flex justify-between">
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Numéro de lot :</span>
                   <span className="font-medium">{batchNumber}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Date et heure :</span>
                   <span className="font-medium">{formatDateTime(timestamp)}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Modèle utilisé :</span>
                   <span className="font-medium">GP V4-BEST</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Seuil de conformité :</span>
                   <span className="font-medium">{threshold.toFixed(3)} W/m·K</span>
                 </div>
@@ -165,25 +203,25 @@ const PredictionSummary = ({ prediction, inputData }) => {
 
             {/* Distribution granulométrique */}
             <div className="space-y-3">
-              <h3 className="text-lg font-medium text-gray-700 border-b pb-2">Distribution granulométrique</h3>
-              <div className="grid grid-cols-1 gap-2 text-sm">
-                <div className="flex justify-between">
+              <h3 className="text-lg font-medium text-gray-700 border-b border-gray-300 pb-2">Distribution granulométrique</h3>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
                   <span className="text-gray-600">{"> 2mm :"}</span>
                   <span className="font-medium">{(inputData.taux_2mm || 0).toFixed(2)}%</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between text-sm">
                   <span className="text-gray-600">{"1-2mm :"}</span>
                   <span className="font-medium">{(inputData.taux_1mm || 0).toFixed(2)}%</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between text-sm">
                   <span className="text-gray-600">{"500μm-1mm :"}</span>
                   <span className="font-medium">{(inputData.taux_500um || 0).toFixed(2)}%</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between text-sm">
                   <span className="text-gray-600">{"250-500μm :"}</span>
                   <span className="font-medium">{(inputData.taux_250um || 0).toFixed(2)}%</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between text-sm">
                   <span className="text-gray-600">{"< 250μm :"}</span>
                   <span className="font-medium">{(inputData.taux_0 || 0).toFixed(2)}%</span>
                 </div>
@@ -195,29 +233,31 @@ const PredictionSummary = ({ prediction, inputData }) => {
           <div className="space-y-6">
             {/* Résultats de prédiction */}
             <div className="space-y-3">
-              <h3 className="text-lg font-medium text-gray-700 flex items-center border-b pb-2">
-                <TrendingUp className="mr-2" size={16} />
-                Résultats de prédiction
+              <h3 className="text-lg font-medium text-gray-700 border-b border-gray-300 pb-2">
+                <span className="flex items-center">
+                  <TrendingUp className="mr-2" size={16} />
+                  Résultats de prédiction
+                </span>
               </h3>
-              <div className={`p-4 rounded-lg border ${statusInfo.bg} ${statusInfo.border}`}>
-                <div className="space-y-3">
-                  <div className="text-center">
-                    <span className="text-gray-700 font-medium">Conductivité thermique :</span>
-                    <div className="text-2xl font-bold text-gray-800 mt-1">
+              <div className={`p-4 rounded-lg border-2 ${statusInfo.bg} ${statusInfo.border}`}>
+                <div className="space-y-4 text-center">
+                  <div>
+                    <span className="text-gray-700 font-medium block mb-1">Conductivité thermique :</span>
+                    <div className="text-2xl font-bold text-gray-800">
                       {lambda_predicted.toFixed(4)} W/m·K
                     </div>
                   </div>
                   {confidence_interval > 0 && (
-                    <div className="text-center">
-                      <span className="text-gray-600 text-sm">Incertitude (90% IC) :</span>
-                      <div className="font-medium text-sm">±{confidence_interval_90.toFixed(4)} W/m·K</div>
+                    <div>
+                      <span className="text-gray-600 text-sm block">Incertitude (90% IC) :</span>
+                      <div className="font-medium">±{confidence_interval_90.toFixed(4)} W/m·K</div>
                     </div>
                   )}
-                  <div className="text-center">
-                    <span className="text-gray-600">Statut :</span>
+                  <div>
+                    <span className="text-gray-600 block">Statut :</span>
                     <div className={`font-bold ${statusInfo.color} text-lg`}>{statusInfo.text}</div>
                   </div>
-                  <div className="text-xs text-gray-500 text-center">
+                  <div className="text-xs text-gray-500 pt-2 border-t border-gray-200">
                     {isConforme 
                       ? `✓ Valeur inférieure au seuil de ${threshold.toFixed(3)} W/m·K`
                       : `✗ Valeur supérieure au seuil de ${threshold.toFixed(3)} W/m·K`
@@ -226,43 +266,13 @@ const PredictionSummary = ({ prediction, inputData }) => {
                 </div>
               </div>
             </div>
-
-            {/* Graphique de validation du modèle */}
-            <div className="space-y-3">
-              <h3 className="text-lg font-medium text-gray-700 border-b pb-2">Validation du modèle</h3>
-              <div className="flex justify-center">
-                <div className="text-center">
-                  <div className="bg-white border border-gray-200 rounded-md overflow-hidden inline-block">
-                    <img 
-                      src="/validation-graph.png" 
-                      alt="Graphique de validation du modèle GP V4-BEST"
-                      className="max-w-full h-auto"
-                      style={{ maxHeight: '200px', maxWidth: '300px' }}
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                        e.target.nextSibling.style.display = 'block';
-                      }}
-                    />
-                    <div 
-                      style={{ display: 'none' }}
-                      className="w-72 h-48 bg-gray-100 border border-gray-200 rounded-md flex items-center justify-center text-gray-500 text-sm"
-                    >
-                      Graphique de validation non disponible
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-600 mt-2">
-                    Validation croisée : prédiction vs mesures réelles
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 
         {/* Pied de page */}
-        <div className="border-t pt-4 text-center text-xs text-gray-500">
-          <p>Rapport généré automatiquement par ThermoStraw Analyzer</p>
-          <p>Modèle GP V4-BEST - {formatDateTime(timestamp)}</p>
+        <div className="border-t border-gray-300 pt-4 mt-6 text-center">
+          <p className="text-xs text-gray-500">Rapport généré automatiquement par ThermoStraw Analyzer</p>
+          <p className="text-xs text-gray-500">Modèle GP V4-BEST - {formatDateTime(timestamp)}</p>
         </div>
       </div>
 
