@@ -118,39 +118,6 @@ function App() {
             )}
           </div>
         </div>
-        
-        {/* Section d'information sur le modèle */}
-        <div className="mt-8 bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold mb-4">À propos du modèle</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="text-sm text-gray-600">
-              <p className="mb-3">
-                Cette application utilise le modèle GP V4-BEST avec l'indicateur EE_best 
-                pour prédire la conductivité thermique de la paille hachée à partir de sa 
-                distribution granulométrique.
-              </p>
-              <p className="mb-2 font-medium">Paramètres optimisés :</p>
-              <ul className="list-disc pl-5 space-y-1">
-                <li>k500 = 1.83</li>
-                <li>k250 = 3.04</li>
-                <li>c = 0.196</li>
-                <li>dmax = 1.76%</li>
-                <li>α = 0.572</li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold mb-2">Validation du modèle</h3>
-              <div className="text-center">
-                <div className="w-full h-48 bg-gray-100 rounded-md border border-gray-200 flex items-center justify-center">
-                  <span className="text-gray-500">Graphique de validation du modèle</span>
-                </div>
-                <p className="text-xs text-gray-600 mt-2">
-                  Validation du modèle GP V4-BEST: prédiction vs mesures réelles
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
