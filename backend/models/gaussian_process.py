@@ -104,8 +104,8 @@ class ThermalConductivityPredictor:
         dict
             Dictionnaire contenant:
             - 'lambda_predicted': la conductivité thermique prédite (W/m·K)
-            - 'confidence_interval': l'intervalle de confiance à 95% (W/m·K)
-            - 'status': le statut (green, orange, red) selon les critères définis
+            - 'confidence_interval': l'intervalle de confiance à 90% (W/m·K)
+            - 'status': le statut conforme/non conforme selon le seuil
         """
         # Vérification que la somme des fractions est proche de 100%
         total = taux_2mm + taux_1mm + taux_500um + taux_250um + taux_0
@@ -124,40 +124,14 @@ class ThermalConductivityPredictor:
         # Prédiction avec le modèle GP
         lambda_pred, std = self.model.predict(X_pred, return_std=True)
         
-        # Calcul de l'intervalle de confiance à 95%
-        confidence_interval = 1.96 * std[0]
+        # Calcul de l'intervalle de confiance à 90% (1.645 au lieu de 1.96 pour 95%)
+        confidence_interval = 1.645 * std[0] if len(std) > 0 and std[0] > 0 else 0.0
         
-        # Détermination du statut
-        status = "green"
+        # Seuil de conformité
+        threshold = 0.045
         
-        # Définition des plages optimales
-        optimal_ranges = {
-            "taux_2mm": [12, 18],
-            "taux_1mm": [53, 58],
-            "taux_500um": [19, 24],
-            "taux_250um": [4, 7],
-            "taux_0": [0, 1]
-        }
-        
-        # Vérification du seuil de conductivité
-        threshold = 0.041
-        if lambda_pred[0] > threshold:
-            status = "red"
-        else:
-            # Vérification des plages optimales
-            fractions = {
-                "taux_2mm": taux_2mm,
-                "taux_1mm": taux_1mm,
-                "taux_500um": taux_500um,
-                "taux_250um": taux_250um,
-                "taux_0": taux_0
-            }
-            
-            for key, value in fractions.items():
-                min_val, max_val = optimal_ranges[key]
-                if value < min_val or value > max_val:
-                    status = "orange"
-                    break
+        # Détermination du statut simplifié : conforme ou non conforme
+        status = "conforme" if lambda_pred[0] <= threshold else "non_conforme"
         
         return {
             "lambda_predicted": float(lambda_pred[0]),
@@ -165,7 +139,7 @@ class ThermalConductivityPredictor:
             "status": status,
             "r1p_log": float(r1p_log),
             "ee_best": float(ee_best),
-            "optimal_ranges": optimal_ranges
+            "threshold": threshold
         }
     
     def add_sample(self, taux_2mm, taux_1mm, taux_500um, taux_250um, taux_0, lambda_value):

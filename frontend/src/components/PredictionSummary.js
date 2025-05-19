@@ -32,27 +32,29 @@ const PredictionSummary = ({ prediction, inputData }) => {
     }
   };
 
-  // Déterminer le statut et la couleur avec valeur par défaut
-  const getStatusInfo = (status) => {
-    switch (status) {
-      case 'green':
-        return { text: 'Conforme', color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200' };
-      case 'orange':
-        return { text: 'Attention', color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200' };
-      case 'red':
-        return { text: 'Non conforme', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' };
-      default:
-        return { text: 'Inconnu', color: 'text-gray-600', bg: 'bg-gray-50', border: 'border-gray-200' };
-    }
-  };
-
-  const statusInfo = getStatusInfo(prediction.status);
-
   // Valeurs par défaut pour éviter les erreurs
   const lambda_predicted = prediction.lambda_predicted || 0;
   const confidence_interval = prediction.confidence_interval || 0;
   const batchNumber = inputData.batchNumber || 'Non spécifié';
   const timestamp = inputData.timestamp || new Date().toISOString();
+  
+  // Récupérer le seuil depuis la réponse du backend si disponible
+  const threshold = prediction.threshold || 0.045;
+  
+  // Déterminer le statut depuis la réponse du backend ou par défaut
+  const backendStatus = prediction.status;
+  let isConforme, statusInfo;
+  
+  if (backendStatus === 'conforme' || (backendStatus !== 'non_conforme' && lambda_predicted <= threshold)) {
+    isConforme = true;
+    statusInfo = { text: 'Conforme', color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200' };
+  } else {
+    isConforme = false;
+    statusInfo = { text: 'Non conforme', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' };
+  }
+
+  // L'incertitude est déjà calculée à 90% IC dans le backend
+  const confidence_interval_90 = confidence_interval;
 
   // Copier sous forme d'image
   const handleCopyAsImage = async () => {
@@ -135,6 +137,10 @@ const PredictionSummary = ({ prediction, inputData }) => {
               <span className="text-gray-600">Modèle utilisé :</span>
               <span className="font-medium">GP V4-BEST</span>
             </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Seuil de conformité :</span>
+              <span className="font-medium">{threshold.toFixed(3)} W/m·K</span>
+            </div>
           </div>
         </div>
 
@@ -179,13 +185,21 @@ const PredictionSummary = ({ prediction, inputData }) => {
                   {lambda_predicted.toFixed(4)} W/m·K
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 text-sm">Incertitude (95% IC) :</span>
-                <span className="font-medium text-sm">±{confidence_interval.toFixed(4)} W/m·K</span>
-              </div>
+              {confidence_interval > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600 text-sm">Incertitude (90% IC) :</span>
+                  <span className="font-medium text-sm">±{confidence_interval_90.toFixed(4)} W/m·K</span>
+                </div>
+              )}
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Statut :</span>
                 <span className={`font-bold ${statusInfo.color}`}>{statusInfo.text}</span>
+              </div>
+              <div className="text-xs text-gray-500">
+                {isConforme 
+                  ? `✓ Valeur inférieure au seuil de ${threshold.toFixed(3)} W/m·K`
+                  : `✗ Valeur supérieure au seuil de ${threshold.toFixed(3)} W/m·K`
+                }
               </div>
             </div>
           </div>
@@ -196,113 +210,27 @@ const PredictionSummary = ({ prediction, inputData }) => {
           <h3 className="text-lg font-medium text-gray-700 border-b pb-2">Validation du modèle</h3>
           <div className="flex justify-center bg-gray-50 p-4 rounded-lg">
             <div className="text-center">
-              <div className="w-96 h-64 bg-white border border-gray-200 rounded-md overflow-hidden">
-                <svg width="100%" height="100%" viewBox="0 0 384 256" style={{ background: '#ffffff' }}>
-                  {/* Titre */}
-                  <text x="192" y="20" textAnchor="middle" fontSize="14" fontWeight="bold" fill="#1f2937">
-                    Validation GP V4 - BEST
-                  </text>
-                  
-                  {/* Zone de confiance */}
-                  <polygon points="80,200 320,120 320,140 80,220" fill="#c3f0ca" opacity="0.3"/>
-                  
-                  {/* Axes */}
-                  <line x1="80" y1="40" x2="80" y2="240" stroke="#6b7280" strokeWidth="1"/>
-                  <line x1="80" y1="240" x2="320" y2="240" stroke="#6b7280" strokeWidth="1"/>
-                  
-                  {/* Grille */}
-                  <line x1="80" y1="80" x2="320" y2="80" stroke="#e5e7eb" strokeWidth="0.5"/>
-                  <line x1="80" y1="120" x2="320" y2="120" stroke="#e5e7eb" strokeWidth="0.5"/>
-                  <line x1="80" y1="160" x2="320" y2="160" stroke="#e5e7eb" strokeWidth="0.5"/>
-                  <line x1="80" y1="200" x2="320" y2="200" stroke="#e5e7eb" strokeWidth="0.5"/>
-                  
-                  <line x1="120" y1="40" x2="120" y2="240" stroke="#e5e7eb" strokeWidth="0.5"/>
-                  <line x1="160" y1="40" x2="160" y2="240" stroke="#e5e7eb" strokeWidth="0.5"/>
-                  <line x1="200" y1="40" x2="200" y2="240" stroke="#e5e7eb" strokeWidth="0.5"/>
-                  <line x1="240" y1="40" x2="240" y2="240" stroke="#e5e7eb" strokeWidth="0.5"/>
-                  <line x1="280" y1="40" x2="280" y2="240" stroke="#e5e7eb" strokeWidth="0.5"/>
-                  
-                  {/* Points de données */}
-                  <circle cx="120" cy="210" r="3" fill="#3b82f6"/>
-                  <circle cx="150" cy="190" r="3" fill="#3b82f6"/>
-                  <circle cx="160" cy="200" r="3" fill="#3b82f6"/>
-                  <circle cx="180" cy="185" r="3" fill="#3b82f6"/>
-                  <circle cx="200" cy="180" r="3" fill="#3b82f6"/>
-                  <circle cx="220" cy="170" r="3" fill="#3b82f6"/>
-                  <circle cx="240" cy="175" r="3" fill="#3b82f6"/>
-                  <circle cx="260" cy="165" r="3" fill="#3b82f6"/>
-                  <circle cx="280" cy="160" r="3" fill="#3b82f6"/>
-                  <circle cx="300" cy="150" r="3" fill="#3b82f6"/>
-                  <circle cx="290" cy="155" r="3" fill="#3b82f6"/>
-                  <circle cx="270" cy="172" r="3" fill="#3b82f6"/>
-                  
-                  {/* Ligne de tendance */}
-                  <line x1="100" y1="215" x2="310" y2="145" stroke="#1f2937" strokeWidth="2" strokeDasharray="4,4"/>
-                  
-                  {/* Labels des axes */}
-                  <text x="200" y="255" textAnchor="middle" fontSize="10" fill="#6b7280">
-                    λ réel (W/m·K)
-                  </text>
-                  <text x="25" y="140" textAnchor="middle" fontSize="10" fill="#6b7280" transform="rotate(-90 25 140)">
-                    λ prédit (W/m·K)
-                  </text>
-                  
-                  {/* Échelle */}
-                  <text x="75" y="245" textAnchor="end" fontSize="8" fill="#6b7280">0.0386</text>
-                  <text x="75" y="205" textAnchor="end" fontSize="8" fill="#6b7280">0.0396</text>
-                  <text x="75" y="165" textAnchor="end" fontSize="8" fill="#6b7280">0.0406</text>
-                  <text x="75" y="125" textAnchor="end" fontSize="8" fill="#6b7280">0.0416</text>
-                  <text x="75" y="85" textAnchor="end" fontSize="8" fill="#6b7280">0.0426</text>
-                  
-                  <text x="120" y="252" textAnchor="middle" fontSize="8" fill="#6b7280">0.0386</text>
-                  <text x="160" y="252" textAnchor="middle" fontSize="8" fill="#6b7280">0.0396</text>
-                  <text x="200" y="252" textAnchor="middle" fontSize="8" fill="#6b7280">0.0406</text>
-                  <text x="240" y="252" textAnchor="middle" fontSize="8" fill="#6b7280">0.0416</text>
-                  <text x="280" y="252" textAnchor="middle" fontSize="8" fill="#6b7280">0.0426</text>
-                  
-                  {/* Annotation R² */}
-                  <rect x="250" y="60" width="60" height="20" fill="#f3f4f6" stroke="#d1d5db"/>
-                  <text x="280" y="73" textAnchor="middle" fontSize="9" fill="#374151">R² = 0.89</text>
-                </svg>
+              <div className="bg-white border border-gray-200 rounded-md overflow-hidden inline-block">
+                <img 
+                  src="/validation-graph.png" 
+                  alt="Graphique de validation du modèle GP V4-BEST"
+                  className="max-w-full h-auto"
+                  style={{ maxHeight: '300px' }}
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.nextSibling.style.display = 'block';
+                  }}
+                />
+                <div 
+                  style={{ display: 'none' }}
+                  className="w-96 h-64 bg-gray-100 border border-gray-200 rounded-md flex items-center justify-center text-gray-500"
+                >
+                  Graphique de validation non disponible
+                </div>
               </div>
               <p className="text-xs text-gray-600 mt-2">
                 Validation croisée : prédiction vs mesures réelles
               </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Paramètres du modèle */}
-        <div className="space-y-3">
-          <h3 className="text-lg font-medium text-gray-700 border-b pb-2">Paramètres du modèle</h3>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div className="space-y-1">
-              <div className="flex justify-between">
-                <span className="text-gray-600">k500 :</span>
-                <span className="font-medium">1.83</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">k250 :</span>
-                <span className="font-medium">3.04</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">c :</span>
-                <span className="font-medium">0.196</span>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <div className="flex justify-between">
-                <span className="text-gray-600">dmax :</span>
-                <span className="font-medium">1.76%</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">α :</span>
-                <span className="font-medium">0.572</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">R² :</span>
-                <span className="font-medium">0.89</span>
-              </div>
             </div>
           </div>
         </div>
