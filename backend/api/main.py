@@ -5,11 +5,9 @@ from typing import Dict, List
 import numpy as np
 import sys, os
 
-# ───────── Imports internes ─────────
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from models.gaussian_process import ThermalConductivityPredictor
 
-# ───────── Application ─────────
 app = FastAPI(title="ThermoStraw Analyzer API")
 
 app.add_middleware(
@@ -22,9 +20,11 @@ app.add_middleware(
 
 predictor = ThermalConductivityPredictor()
 measurements_history: List[dict] = []
-chart_images: Dict[str, str] = {}   # clé = fractions normalisées → base64
 
-# ───────── Modèles Pydantic ─────────
+# ---------- UNE SEULE IMAGE EN MÉMOIRE ----------
+chart_image_last: str | None = None    # base64 sans préfixe
+
+# ---------- Modèles ----------
 class GranulometricFractions(BaseModel):
     taux_2mm: float
     taux_1mm: float
@@ -33,73 +33,46 @@ class GranulometricFractions(BaseModel):
     taux_0: float
 
 class ChartImageRequest(BaseModel):
-    fractions: GranulometricFractions
-    chart_image: str                  # base64 (data URI acceptée)
+    fractions: Dict[str, float] | None = None
+    chart_image: str
 
 class LaboratoryMeasurement(BaseModel):
     fractions: GranulometricFractions
     lambda_value: float
 
-class PredictionResult(BaseModel):
-    lambda_predicted: float
-    confidence_interval: float
-    status: str
-    optimal_ranges: Dict[str, List[float]]
-
-# ───────── Helpers ─────────
-def make_key(fr: dict) -> str:
-    """Clé cohérente pour stocker/retrouver l’image."""
-    return "_".join(f"{k}_{float(v):.1f}" for k, v in sorted(fr.items()))
-
-# ───────── Endpoints ─────────
+# ---------- Endpoints ----------
 @app.get("/")
 def root():
     return {"message": "ThermoStraw API running"}
 
-@app.post("/predict", response_model=PredictionResult)
-def predict(fractions: GranulometricFractions):
-    try:
-        if any(v < 0 for v in fractions.dict().values()):
-            raise HTTPException(400, "Les fractions doivent être positives")
-        result = predictor.predict(**fractions.dict())
-        measurements_history.append({
-            "fractions": fractions.dict(),
-            "prediction": {"lambda_predicted": result["lambda_predicted"],
-                           "status": result["status"]},
-            "timestamp": float(np.datetime64("now").astype("float64"))
-        })
-        return result
-    except ValueError as e:
-        raise HTTPException(400, str(e))
-    except Exception as e:
-        raise HTTPException(500, f"Erreur de prédiction: {e}")
-
 @app.post("/save-chart-image")
 def save_chart(req: ChartImageRequest):
+    global chart_image_last
     try:
-        key = make_key(req.fractions.dict())
-        chart_images[key] = req.chart_image.split(",")[-1]   # stocke juste le base64
-        return {"message": "Image sauvegardée", "key": key}
+        # stocke la dernière image (base64 sans entête)
+        chart_image_last = req.chart_image.split(",")[-1]
+        return {"message": "Image sauvegardée sous cleImage"}
     except Exception as e:
         raise HTTPException(500, f"Erreur save-chart: {e}")
 
 @app.post("/predict-image")
 def predict_image(fracs: GranulometricFractions):
     try:
-        key = make_key(fracs.dict())
-        img = chart_images.get(key, "")
-        result = predictor.predict(**fracs.dict())
+        if chart_image_last is None:
+            return {"chart_image": ""}   # aucun PNG dispo
+
+        res = predictor.predict(**fracs.dict())
         measurements_history.append({
             "fractions": fracs.dict(),
-            "prediction": {"lambda_predicted": result["lambda_predicted"],
-                           "status": result["status"]},
+            "prediction": {"lambda_predicted": res["lambda_predicted"],
+                           "status": res["status"]},
             "timestamp": float(np.datetime64("now").astype("float64"))
         })
         return {
-            "lambda_predicted": result["lambda_predicted"],
-            "confidence_interval": result["confidence_interval"],
-            "status": result["status"],
-            "chart_image": f"data:image/png;base64,{img}" if img else ""
+            "lambda_predicted": res["lambda_predicted"],
+            "confidence_interval": res["confidence_interval"],
+            "status": res["status"],
+            "chart_image": "data:image/png;base64," + chart_image_last
         }
     except Exception as e:
         raise HTTPException(500, f"Erreur predict-image: {e}")
@@ -107,7 +80,6 @@ def predict_image(fracs: GranulometricFractions):
 @app.post("/add-laboratory-sample")
 def add_sample(m: LaboratoryMeasurement):
     try:
-        res = predictor.add_sample(**m.fractions.dict(), lambda_value=m.lambda_value)
-        return res
+        return predictor.add_sample(**m.fractions.dict(), lambda_value=m.lambda_value)
     except Exception as e:
         raise HTTPException(500, f"Erreur add-sample: {e}")
