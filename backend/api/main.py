@@ -5,8 +5,21 @@ from typing import Dict, List
 import numpy as np
 import sys, os
 
+# Ajout du chemin pour l'import (Railway-compatible)
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from backend.models.gaussian_process_archive import ThermalConductivityPredictor
+
+# Import corrigé - essaie plusieurs chemins
+try:
+    # Essaie d'abord l'import relatif pour Railway
+    from models.gaussian_process_archive import ThermalConductivityPredictor
+except ImportError:
+    try:
+        # Si ça échoue, essaie l'import avec backend pour le développement local
+        from backend.models.gaussian_process_archive import ThermalConductivityPredictor
+    except ImportError:
+        # Dernier recours : import direct
+        import gaussian_process_archive
+        ThermalConductivityPredictor = gaussian_process_archive.ThermalConductivityPredictor
 
 app = FastAPI(title="ThermoStraw Analyzer API")
 
