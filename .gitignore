@@ -5,7 +5,10 @@ __pycache__/
 *.so
 .Python
 backend/venv/
+thermostraw-analyzer/
+venv/
 env/
+ENV/
 build/
 develop-eggs/
 dist/
@@ -20,6 +23,30 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+
+# Machine Learning models
+*.pkl
+# EXCEPTION : Garder le modèle optimisé pour Railway
+!backend/models/modele_GP_conductivite_22lots.pkl
+
+# Generated plots
+validation_initiale_GP.png
+calibration_random_search.png
+validation_finale_GP_calibre.png
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
 
 # React
 frontend/node_modules/

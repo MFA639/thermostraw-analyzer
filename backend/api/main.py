@@ -8,18 +8,18 @@ import sys, os
 # Ajout du chemin pour l'import (Railway-compatible)
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Import corrigé - essaie plusieurs chemins
+# Import du modèle optimisé (22 échantillons, paramètres calibrés)
 try:
     # Essaie d'abord l'import relatif pour Railway
-    from models.gaussian_process_archive import ThermalConductivityPredictor
+    from models.optimized_model import OptimizedThermalConductivityPredictor as ThermalConductivityPredictor
 except ImportError:
     try:
         # Si ça échoue, essaie l'import avec backend pour le développement local
-        from backend.models.gaussian_process_archive import ThermalConductivityPredictor
+        from backend.models.optimized_model import OptimizedThermalConductivityPredictor as ThermalConductivityPredictor
     except ImportError:
-        # Dernier recours : import direct
-        import gaussian_process_archive
-        ThermalConductivityPredictor = gaussian_process_archive.ThermalConductivityPredictor
+        # Fallback sur l'ancien modèle si le nouveau n'est pas disponible
+        print("⚠️  Impossible de charger le modèle optimisé, utilisation du modèle legacy")
+        from models.gaussian_process_archive import ThermalConductivityPredictor
 
 app = FastAPI(title="ThermoStraw Analyzer API")
 
