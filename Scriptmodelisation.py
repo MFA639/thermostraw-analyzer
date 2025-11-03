@@ -26,9 +26,11 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel
 from sklearn.model_selection import LeaveOneOut
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+from datetime import datetime
 
-# Configuration matplotlib pour VSCode
+# Configuration matplotlib pour exécution en arrière-plan
 plt.style.use('default')
+plt.ioff()  # Désactiver le mode interactif
 
 # ============================================================================
 # SECTION 1 : CHARGEMENT ET NETTOYAGE DES DONNÉES
@@ -245,7 +247,7 @@ plt.grid(True, alpha=0.3)
 plt.tight_layout()
 plt.savefig('validation_initiale_GP.png', dpi=150)
 print("✅ Graphique sauvegardé : validation_initiale_GP.png")
-plt.show()
+plt.close()  # Fermer au lieu de show() pour exécution en arrière-plan
 
 
 
@@ -256,6 +258,7 @@ plt.show()
 print("\n" + "=" * 80)
 print("SECTION 4 : Calibration des paramètres EE par recherche aléatoire")
 print("=" * 80)
+print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Début de la section 4 - Calibration")
 
 def EE_general(row, k500, k250, c, dmax, alpha):
     """
@@ -310,12 +313,16 @@ print("   - alpha : [0.3, 0.6]")
 records = []
 y = df['lambda'].values
 
-# Barre de progression simple
+# Barre de progression améliorée
 print("\n⏳ Progression :")
+start_time = datetime.now()
 for itr in range(N_TRY):
-    # Affichage de la progression tous les 1500 essais
-    if (itr + 1) % 1500 == 0:
-        print(f"   {itr + 1}/{N_TRY} combinaisons testées ({100*(itr+1)/N_TRY:.0f}%)")
+    # Affichage de la progression tous les 500 essais
+    if (itr + 1) % 500 == 0:
+        elapsed = (datetime.now() - start_time).total_seconds()
+        estimated_total = (elapsed / (itr + 1)) * N_TRY
+        remaining = estimated_total - elapsed
+        print(f"   [{datetime.now().strftime('%H:%M:%S')}] {itr + 1}/{N_TRY} combinaisons ({100*(itr+1)/N_TRY:.1f}%) - Temps restant estimé: {int(remaining//60)}m {int(remaining%60)}s")
 
     # Tirage aléatoire des 5 paramètres dans leurs plages respectives
     k500 = random.uniform(1.5, 4.0)
@@ -379,7 +386,7 @@ plt.grid(alpha=0.3)
 plt.tight_layout()
 plt.savefig('calibration_random_search.png', dpi=150)
 print("\n✅ Graphique sauvegardé : calibration_random_search.png")
-plt.show()
+plt.close()  # Fermer au lieu de show() pour exécution en arrière-plan
 
 # Sélection du meilleur jeu de paramètres
 b0 = best_df.iloc[0]
@@ -474,7 +481,7 @@ plt.grid(True, alpha=0.3)
 plt.tight_layout()
 plt.savefig('validation_finale_GP_calibre.png', dpi=150)
 print("\n✅ Graphique sauvegardé : validation_finale_GP_calibre.png")
-plt.show()
+plt.close()  # Fermer au lieu de show() pour exécution en arrière-plan
 
 
 # ============================================================================
