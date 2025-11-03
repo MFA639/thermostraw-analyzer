@@ -14,19 +14,8 @@ Amélioration par rapport à l'ancien modèle :
 
 import numpy as np
 import joblib
-import os
 import pickle
 from pathlib import Path
-
-
-class NumpyUnpickler(pickle.Unpickler):
-    """Unpickler personnalisé pour gérer les incompatibilités NumPy"""
-    def find_class(self, module, name):
-        # Gérer l'incompatibilité du générateur aléatoire MT19937
-        if module == 'numpy.random._mt19937' and name == 'MT19937':
-            from numpy.random import MT19937
-            return MT19937
-        return super().find_class(module, name)
 
 class OptimizedThermalConductivityPredictor:
     """
@@ -44,15 +33,7 @@ class OptimizedThermalConductivityPredictor:
                 "Assurez-vous que modele_GP_conductivite_22lots.pkl est dans le dossier models/"
             )
 
-        # Chargement du modèle et des paramètres optimisés
-        try:
-            # Essai standard
-            model_data = joblib.load(model_path)
-        except (ValueError, AttributeError) as e:
-            # Si échec (incompatibilité NumPy), utiliser l'unpickler personnalisé
-            print(f"⚠️  Utilisation de l'unpickler personnalisé pour gérer l'incompatibilité NumPy")
-            with open(model_path, 'rb') as f:
-                model_data = NumpyUnpickler(f).load()
+        model_data = self._load_model_data(model_path)
 
         self.model = model_data['GP']
         self.params = model_data['params']
@@ -80,6 +61,80 @@ class OptimizedThermalConductivityPredictor:
         print(f"   Paramètres calibrés :")
         for param, value in self.params.items():
             print(f"     {param:6s} = {float(value):.4f}")
+
+    @staticmethod
+    def _load_model_data(model_path: Path):
+        """
+        Charge le fichier joblib en essayant de corriger les incompatibilités
+        liées au générateur aléatoire MT19937 des versions récentes de NumPy.
+        """
+        try:
+            return joblib.load(model_path)
+        except (ValueError, AttributeError, pickle.UnpicklingError) as original_error:
+            print(
+                "⚠️  Détection d'une incompatibilité NumPy lors du chargement du modèle, "
+                "application d'un patch MT19937 de secours."
+            )
+            return OptimizedThermalConductivityPredictor._load_with_mt19937_patch(
+                model_path, original_error
+            )
+
+    @staticmethod
+    def _load_with_mt19937_patch(model_path: Path, original_error: Exception):
+        """
+        Certain environnements (builds Railway, conteneurs slim) embarquent un NumPy
+        qui ne possède pas le nouveau système de BitGenerator. On remappe le constructeur
+        MT19937 pour retomber sur une implémentation compatible.
+        """
+        try:
+            import numpy.random._pickle as numpy_pickle
+        except ModuleNotFoundError as import_error:
+            raise RuntimeError(
+                "NumPy installé ne permet pas de charger le modèle optimisé "
+                "(module numpy.random._pickle absent)."
+            ) from import_error
+
+        original_ctor = getattr(numpy_pickle, "__bit_generator_ctor")
+
+        def patched_bit_generator_ctor(bit_generator='MT19937'):
+            """
+            Rejoue le constructeur standard, mais intercepte l'échec pour mapper MT19937
+            vers une implémentation disponible dans NumPy legacy.
+            """
+            try:
+                return original_ctor(bit_generator)
+            except ValueError:
+                name = (
+                    bit_generator
+                    if isinstance(bit_generator, str)
+                    else getattr(bit_generator, "__name__", "MT19937")
+                )
+
+                if "MT19937" in name:
+                    # Préfère l'interface moderne si disponible, sinon bascule sur RandomState.
+                    try:
+                        from numpy.random import MT19937  # type: ignore
+
+                        return MT19937()
+                    except (ImportError, AttributeError):
+                        from numpy.random import RandomState
+
+                        legacy_rng = RandomState()
+                        return getattr(legacy_rng, "bit_generator", legacy_rng)
+
+                raise
+
+        setattr(numpy_pickle, "__bit_generator_ctor", patched_bit_generator_ctor)
+        try:
+            return joblib.load(model_path)
+        except Exception as patched_error:
+            raise RuntimeError(
+                "Impossible de charger le modèle optimisé même après application "
+                "du patch MT19937. Veuillez mettre à jour NumPy (>=1.17) ou régénérer "
+                "le modèle."
+            ) from original_error
+        finally:
+            setattr(numpy_pickle, "__bit_generator_ctor", original_ctor)
 
     def _calculate_R1p_log(self, taux_500um, taux_250um):
         """
