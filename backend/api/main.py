@@ -140,6 +140,7 @@ def predict_image(fracs: GranulometricFractions):
             "r1p_log": res.get("r1p_log"),
             "ee_best": res.get("ee_best"),
             "threshold": CURRENT_THRESHOLD,  # Inclure le seuil utilisé
+            "model_info": res.get("model_info", {}),  # Informations du modèle
             "optimal_ranges": res.get("optimal_ranges", {
                 "taux_2mm": [12, 18],
                 "taux_1mm": [53, 58],

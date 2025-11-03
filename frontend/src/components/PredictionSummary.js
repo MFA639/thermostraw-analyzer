@@ -37,9 +37,15 @@ const PredictionSummary = ({ prediction, inputData }) => {
   const confidence_interval = prediction.confidence_interval || 0;
   const batchNumber = inputData.batchNumber || 'Non spécifié';
   const timestamp = inputData.timestamp || new Date().toISOString();
-  
+
   // Récupérer le seuil depuis la réponse du backend si disponible
   const threshold = prediction.threshold || 0.045;
+
+  // Informations du modèle (avec valeurs par défaut si non disponibles)
+  const modelInfo = prediction.model_info || {};
+  const modelName = modelInfo.name || 'GP V4-BEST';
+  const modelVersion = modelInfo.version || 'v1.0';
+  const modelDate = modelInfo.date || '2024';
   
   // Déterminer le statut depuis la réponse du backend ou par défaut
   const backendStatus = prediction.status;
@@ -166,7 +172,7 @@ const PredictionSummary = ({ prediction, inputData }) => {
         <div className="text-center border-b border-gray-300 pb-4 mb-6">
           <h1 className="text-2xl font-bold text-blue-700">RAPPORT D'ANALYSE</h1>
           <h2 className="text-xl font-semibold text-gray-700">Prédiction de la conductivité à partir des fractions granulométriques</h2>
-          <p className="text-sm text-gray-500 mt-2">Modèle GP V4-BEST avec indicateur EE_best</p>
+          <p className="text-sm text-gray-500 mt-2">{modelName} - {modelVersion} ({modelDate})</p>
         </div>
 
         {/* Contenu principal en deux colonnes */}
@@ -192,7 +198,7 @@ const PredictionSummary = ({ prediction, inputData }) => {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Modèle utilisé :</span>
-                  <span className="font-medium">GP V4-BEST</span>
+                  <span className="font-medium">{modelName}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Seuil de conformité :</span>
@@ -272,7 +278,7 @@ const PredictionSummary = ({ prediction, inputData }) => {
         {/* Pied de page */}
         <div className="border-t border-gray-300 pt-4 mt-6 text-center">
           <p className="text-xs text-gray-500">Rapport généré automatiquement par ThermoStraw Analyzer</p>
-          <p className="text-xs text-gray-500">Modèle GP V4-BEST - {formatDateTime(timestamp)}</p>
+          <p className="text-xs text-gray-500">{modelName} ({modelVersion}) - {formatDateTime(timestamp)}</p>
         </div>
       </div>
 

@@ -206,9 +206,13 @@ class OptimizedThermalConductivityPredictor:
             "ee_best": float(ee_best_opt),
             "threshold": threshold,
             "model_info": {
+                "name": "GP22 optimisé",
+                "version": "v2.0-optimized",
+                "date": "2025-11-03",
                 "samples_count": 22,
                 "rmse": 0.000751,
-                "mae": 0.000484
+                "mae": 0.000484,
+                "calibration_trials": 15000
             }
         }
 
