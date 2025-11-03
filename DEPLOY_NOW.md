@@ -84,6 +84,15 @@ git reset --hard v1.0-stable
 git push origin main --force
 ```
 
+### Symptôme: Nouvelles dépendances ignorées
+
+1. Service `thermostraw-api` → **Variables** :
+   ```
+   RAILWAY_INSTALL_COMMAND=python -m pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
+   PYTHON_VERSION=3.11.9
+   ```
+2. Dernier déploiement → menu `⋮` → **Clear build cache** → **Redeploy**.
+
 ### Symptôme: Railway ne redéploie pas
 
 1. Vérifiez que GitHub est bien connecté à Railway

@@ -18,11 +18,11 @@ Le nouveau modèle optimisé offre :
 - ✅ **RMSE de 0.000751 W/m·K** (erreur très faible)
 - ✅ **MAE de 0.000484 W/m·K**
 
-### Fichiers modifiés
+### Fichiers concernés
 
-1. `backend/models/modele_GP_conductivite_22lots.pkl` - Nouveau modèle optimisé
-2. `backend/models/optimized_model.py` - Module de chargement du modèle
-3. `backend/api/main.py` - API mise à jour pour utiliser le nouveau modèle
+- `backend/models/modele_GP_conductivite_22lots.pkl` – modèle optimisé prêt pour Railway
+- `backend/models/optimized_model.py` – logique de chargement avec patch MT19937
+- `requirements.txt` / `backend/requirements.txt` – versions épinglées
 
 ## 🚀 Déploiement sur Railway
 
@@ -35,23 +35,19 @@ git status
 ```
 
 Vous devriez voir :
-- `backend/models/modele_GP_conductivite_22lots.pkl` (nouveau)
-- `backend/models/optimized_model.py` (nouveau)
-- `backend/api/main.py` (modifié)
+- `backend/models/modele_GP_conductivite_22lots.pkl` (modifié)
+- `backend/models/optimized_model.py` (modifié si vous avez touché au chargeur)
+- `requirements.txt` (si des dépendances ont changé)
 
-### Étape 2 : Commit et push vers GitHub
+### Étape 2 : Commit et push
 
 ```bash
-# Ajouter tous les fichiers modifiés
+# Exemple
 git add backend/models/modele_GP_conductivite_22lots.pkl
 git add backend/models/optimized_model.py
-git add backend/api/main.py
-git add DEPLOYMENT.md
+git add requirements.txt
 
-# Créer un commit
-git commit -m "✨ Mise à jour avec modèle optimisé (22 échantillons, RMSE: 0.000751)"
-
-# Pousser vers GitHub
+git commit -m "Mise à jour du modèle optimisé"
 git push origin main
 ```
 
@@ -59,11 +55,23 @@ git push origin main
 
 Railway détecte le push et :
 1. ⏳ Clone le nouveau code
-2. ⏳ Installe les dépendances (`requirements.txt`)
+2. ⏳ Installe les dépendances (`requirements.txt` à la racine)
 3. ⏳ Redémarre le service **thermostraw-api**
 4. ✅ Le nouveau modèle est actif !
 
 **Temps de déploiement estimé** : 2-3 minutes
+
+### Étape 3bis : Forcer une installation propre (optionnel mais recommandé)
+
+Dans le service `thermostraw-api` > onglet **Variables**, ajoutez si besoin :
+
+```
+RAILWAY_INSTALL_COMMAND = python -m pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
+PYTHON_VERSION = 3.11.9
+```
+
+Ensuite, dans **Deployments**, ouvrez la dernière release > menu `⋮` > **Clear build cache** > **Redeploy**.  
+Cela garantit l’utilisation de `numpy==1.26.2` (évite les wheels obsolètes).
 
 ### Étape 4 : Vérifier le déploiement
 
@@ -109,6 +117,8 @@ uvicorn api.main:app --reload --port 8000
 curl http://localhost:8000/
 ```
 
+> ℹ️ Si vous régénérez le modèle localement, exécutez `python create_compatible_model.py` pour écrire un pickle compatible Railway (sans dépendance à `MT19937`).
+
 ## 📊 Comparaison avant/après
 
 | Métrique | Ancien modèle | Nouveau modèle |
@@ -143,6 +153,14 @@ curl http://localhost:8000/
 2. Consulter les logs pour voir les valeurs de R1p_log et EE_best
 3. Comparer avec les résultats du script `Scriptmodelisation.py`
 
+### Avertissement scikit-learn
+
+```
+InconsistentVersionWarning: Trying to unpickle estimator ... from version 1.7.x when using version 1.3.2.
+```
+
+Le modèle fonctionne malgré l’avertissement. Pour l’éliminer, régénérez le pickle avec `create_compatible_model.py` après avoir installé `scikit-learn==1.3.2` localement.
+
 ## 📝 Réentraînement du modèle
 
 Si vous ajoutez de nouveaux échantillons :
@@ -155,7 +173,7 @@ Si vous ajoutez de nouveaux échantillons :
    ```
 3. Copier le nouveau modèle :
    ```bash
-   cp modele_GP_conductivite_22lots.pkl backend/models/
+   python create_compatible_model.py  # écrit directement dans backend/models/
    ```
 4. Commit et push comme décrit ci-dessus
 

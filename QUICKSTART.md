@@ -47,6 +47,20 @@ Après exécution, vous aurez :
 - `calibration_random_search.png`
 - `validation_finale_GP_calibre.png`
 
+### Export vers l'API
+
+Après l'entraînement, régénérez le pickle consommé par l'API :
+
+```bash
+python create_compatible_model.py  # écrit dans backend/models/
+```
+
+Ensuite, vérifiez que le modèle se charge :
+
+```bash
+python -c "from backend.models.optimized_model import OptimizedThermalConductivityPredictor; OptimizedThermalConductivityPredictor()"
+```
+
 ## 🔧 Commandes utiles
 
 ```bash

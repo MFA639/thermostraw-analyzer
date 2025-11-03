@@ -1,126 +1,157 @@
 # Thermostraw Analyzer
 
-Projet de modélisation de la conductivité thermique des matériaux biosourcés (paille, isolants naturels) basé sur leur distribution granulométrique.
+Modélisation et prédiction de la conductivité thermique des matériaux biosourcés à partir de leur distribution granulométrique.  
+Le dépôt combine :
+- Le **backend FastAPI** déployé sur Railway (`backend/`) ;
+- Le **frontend** statique (`frontend/`) ;
+- Les **scripts de modélisation** utilisés pour entraîner et régénérer le modèle (`Scriptmodelisation.py`, `create_compatible_model.py`, etc.).
 
-## Description
+---
 
-Ce projet utilise un modèle de **Gaussian Process Regressor** pour prédire la conductivité thermique d'un matériau en fonction de :
-- La répartition granulométrique (taille des particules)
-- Des variables dérivées (R1p_log, EE_best)
-- Une optimisation par recherche aléatoire (15 000 combinaisons)
+## 1. Structure du dépôt
 
-## Installation
-
-### 1. Activer l'environnement virtuel
-
-```bash
-source thermostraw-analyzer/bin/activate
+```
+.
+├── backend/                      # API FastAPI utilisée en production Railway
+│   ├── api/main.py               # Endpoints publics
+│   ├── models/                   # Modèles ML sérialisés + helpers de chargement
+│   └── requirements.txt          # Dépendances côté backend
+├── frontend/                     # Application web (service derive-labda)
+├── dataset/datasetConductivite.xlsx
+├── Scriptmodelisation.py         # Script complet d'entraînement / calibration
+├── create_compatible_model.py    # Recrée un pickle compatible Railway
+├── convert_model.py              # Re-sérialise un pickle existant avec NumPy local
+├── requirements.txt              # Dépendances communes (build Railway)
+├── README.md                     # Ce document
+├── DEPLOYMENT.md                 # Guide détaillé Railway
+└── QUICKSTART.md                 # Démarrage rapide (script de modélisation)
 ```
 
-### 2. Installer les dépendances (déjà fait)
+---
+
+## 2. Installer les dépendances
+
+Les versions sont épinglées dans `requirements.txt` (root) et `backend/requirements.txt`.  
+Sur une machine locale :
 
 ```bash
+python3 -m venv thermostraw-analyzer
+source thermostraw-analyzer/bin/activate
 pip install -r requirements.txt
 ```
 
-## Structure du projet
+> ℹ️ Railway installe également `requirements.txt` à la racine. Si vous ajoutez une dépendance backend, pensez à la dupliquer dans `backend/requirements.txt`.
 
-```
-thermostraw-analyzer/
-├── dataset/
-│   └── datasetConductivite.xlsx    # Données d'entrée (22 lots)
-├── Scriptmodelisation.py           # Script principal
-├── requirements.txt                # Dépendances Python
-├── thermostraw-analyzer/           # Environnement virtuel
-└── README.md                       # Ce fichier
-```
+---
 
-## Utilisation
-
-### Lancer le script complet
+## 3. Lancer le backend en local
 
 ```bash
-# Activer l'environnement
-source thermostraw-analyzer/bin/activate
-
-# Lancer le script
-python Scriptmodelisation.py
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+uvicorn api.main:app --reload --port 8000
 ```
 
-Le script va :
-1. Charger et nettoyer les données
-2. Calculer les variables dérivées
-3. Effectuer une première validation
-4. Calibrer le modèle (⚠️ prend plusieurs minutes)
-5. Valider le modèle final
-6. Exporter les fichiers résultats
+Points d’attention :
+- Les logs doivent afficher `✅ Modèle optimisé chargé avec succès`.  
+- Le modèle `backend/models/modele_GP_conductivite_22lots.pkl` est déjà converti pour fonctionner sur des environnements NumPy anciens (cas Railway).
+- Pour tester rapidement :
 
-### Fichiers générés
+```bash
+curl http://localhost:8000/
+curl http://localhost:8000/current-threshold
+```
 
-Après exécution, les fichiers suivants seront créés :
+---
 
-**Modèles :**
-- `modele_GP_best.pkl` - Modèle intermédiaire
-- `modele_GP_conductivite_22lots.pkl` - Modèle final optimisé
+## 4. Recalculer / mettre à jour le modèle ML
 
-**Graphiques :**
-- `validation_initiale_GP.png` - Validation avec paramètres initiaux
-- `calibration_random_search.png` - Résultats de la recherche aléatoire
-- `validation_finale_GP_calibre.png` - Validation finale du modèle optimisé
+1. **Exécuter l’entraînement complet** (`Scriptmodelisation.py`).  
+   Voir `QUICKSTART.md` pour les commandes détaillées.
+2. **Re-sérialiser le modèle pour Railway** :
 
-## Utiliser le modèle entraîné
+   ```bash
+   python create_compatible_model.py
+   ```
+
+   Cela produit un `backend/models/modele_GP_conductivite_22lots.pkl` sans référence au générateur `MT19937`, évitant les erreurs NumPy < 1.17.
+
+3. **Vérifier le chargement** :
+
+   ```bash
+   python -c "from backend.models.optimized_model import OptimizedThermalConductivityPredictor; OptimizedThermalConductivityPredictor()"
+   ```
+
+4. **Commit & push** les changements (voir §6).
+
+> 💡 `convert_model.py` permet aussi de re-sauvegarder un pickle existant avec votre version locale de NumPy sans relancer tout l’entraînement.
+
+---
+
+## 5. Exploiter le modèle dans un script
 
 ```python
 import joblib
 import numpy as np
 
-# Charger le modèle
-model_data = joblib.load('modele_GP_conductivite_22lots.pkl')
-GP_model = model_data['GP']
-params = model_data['params']
+model_data = joblib.load("backend/models/modele_GP_conductivite_22lots.pkl")
+GP_model = model_data["GP"]
 
-# Préparer vos données
-# Format : [R1p_log, taux_250um, EE_best_opt]
-X_nouvelles = np.array([[...]])  # Vos données
-
-# Prédire la conductivité thermique
-prediction = GP_model.predict(X_nouvelles)
-print(f"Conductivité prédite : {prediction[0]:.6f} W/m·K")
+# Exemple de features : [R1p_log, taux_250um, EE_best_opt]
+X = np.array([[1.23, 4.8, 0.57]])
+lambda_pred = GP_model.predict(X)[0]
+print(f"Conductivité prédite : {lambda_pred:.6f} W/m·K")
 ```
 
-## Dépendances
+Variables dérivées :
+- `R1p_log` : logarithme de l’indice fines/intermédiaires ;
+- `taux_250um` : fraction granulométrique à 250 µm ;
+- `EE_best_opt` : connectivité effective optimisée.
 
-- Python >= 3.10
-- pandas >= 2.0.0
-- numpy >= 1.24.0
-- scikit-learn >= 1.3.0
-- matplotlib >= 3.7.0
-- openpyxl >= 3.1.0
-- joblib >= 1.3.0
+Métriques finales attendues :
+- RMSE ≈ 0.00075 W/m·K ;
+- MAE ≈ 0.00048 W/m·K ;
+- R² > 0.95.
 
-## Métriques de performance attendues
+---
 
-Après calibration, le modèle devrait atteindre :
-- **R² > 0.95** (coefficient de détermination)
-- **RMSE < 0.002 W/m·K** (erreur quadratique moyenne)
-- **MAE < 0.001 W/m·K** (erreur absolue moyenne)
+## 6. Déployer sur Railway
 
-## Notes techniques
+1. **Préparer les commits** :
 
-### Variables d'entrée du modèle
+   ```bash
+   git status
+   git add ...
+   git commit -m "..."
+   git push origin main
+   ```
 
-- **R1p_log** : Logarithme de l'indice de répartition fines/intermédiaires
-- **taux_250um** : Pourcentage de particules de 250µm
-- **EE_best_opt** : Interconnexion effective optimisée
+2. Railway déclenche automatiquement un build (service `thermostraw-api`).  
+   Vérifiez les logs : `✅ Modèle optimisé chargé avec succès`.
 
-### Paramètres calibrés (EE_general)
+3. Pour un rebuild propre, ajoutez si nécessaire ces variables dans le service :
+   - `RAILWAY_INSTALL_COMMAND = python -m pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt`
+   - `PYTHON_VERSION = 3.11.9`
 
-- **k500** : Coefficient pour fraction 500µm (plage: 1.5-4.0)
-- **k250** : Coefficient pour fraction 250µm (plage: 3.0-8.0)
-- **c** : Coefficient d'influence des fines (plage: 0.05-0.2)
-- **dmax** : Seuil maximal de poussière (plage: 1.0-2.0)
-- **alpha** : Exposant de pénalité (plage: 0.3-0.6)
+   Puis relancez un déploiement en vidant le cache (`Clear build cache`).
 
-## Auteur
+👉 Consultez `DEPLOYMENT.md` et `DEPLOY_NOW.md` pour la procédure détaillée (frontend + backend, rollback, vérifications).
 
-Script récupéré et adapté de Google Colab pour VSCode (2025)
+---
+
+## 7. Ressources complémentaires
+
+- `QUICKSTART.md` : exécution rapide du script d’entraînement.
+- `DEPLOYMENT.md` : guide complet Railway (variables, clear cache, tests).
+- `DEPLOY_NOW.md` : aide-mémoire pour la mise en production immédiate.
+- `ROLLBACK.md` : revenir sur une version stable en cas de souci.
+- `FEATURE_MODEL_UPLOAD.md` : notes sur l’upload futur de nouveaux modèles.
+
+---
+
+## 8. Remerciements
+
+Projet récupéré depuis Google Colab et adapté pour VSCode / Railway (2025).  
+Merci à tous les contributeurs ThermoStraw !
