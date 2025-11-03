@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 
 const FractionInputForm = ({ onSubmit, isLoading }) => {
   const [fractions, setFractions] = useState({
-    taux_2mm: 15.83,
-    taux_1mm: 53.44,
-    taux_500um: 20.46,
-    taux_250um: 7.26,
-    taux_0: 3.01
+    taux_2mm: '15.83',
+    taux_1mm: '53.44',
+    taux_500um: '20.46',
+    taux_250um: '7.26',
+    taux_0: '3.01'
   });
 
   const [batchNumber, setBatchNumber] = useState('');
@@ -14,7 +14,9 @@ const FractionInputForm = ({ onSubmit, isLoading }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFractions({ ...fractions, [name]: parseFloat(value) || 0 });
+    // Stocker la valeur telle quelle (string ou vide)
+    // La conversion en nombre se fera à la soumission
+    setFractions({ ...fractions, [name]: value });
   };
 
   const handleBatchNumberChange = (e) => {
@@ -22,29 +24,45 @@ const FractionInputForm = ({ onSubmit, isLoading }) => {
   };
 
   const validateInput = () => {
-    const total = Object.values(fractions).reduce((sum, val) => sum + val, 0);
-    
+    // Convertir toutes les valeurs en nombres
+    const numericFractions = {};
+    for (const [key, val] of Object.entries(fractions)) {
+      const num = parseFloat(val);
+      if (isNaN(num)) {
+        setError(`Valeur invalide pour ${key}`);
+        return false;
+      }
+      numericFractions[key] = num;
+    }
+
+    const total = Object.values(numericFractions).reduce((sum, val) => sum + val, 0);
+
     if (total < 99 || total > 101) {
       setError(`La somme des fractions doit être proche de 100%. Actuellement: ${total.toFixed(2)}%`);
       return false;
     }
-    
+
     if (!batchNumber.trim()) {
       setError('Le numéro de lot est obligatoire');
       return false;
     }
-    
+
     setError('');
     return true;
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
+
     if (validateInput()) {
-      // Combiner toutes les données à envoyer
+      // Convertir les valeurs en nombres et combiner avec les métadonnées
+      const numericFractions = {};
+      for (const [key, val] of Object.entries(fractions)) {
+        numericFractions[key] = parseFloat(val) || 0;
+      }
+
       const submissionData = {
-        ...fractions,
+        ...numericFractions,
         batchNumber: batchNumber.trim(),
         timestamp: new Date().toISOString()
       };
@@ -53,7 +71,7 @@ const FractionInputForm = ({ onSubmit, isLoading }) => {
   };
 
   const getTotal = () => {
-    return Object.values(fractions).reduce((sum, val) => sum + val, 0);
+    return Object.values(fractions).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
   };
 
   return (
@@ -87,14 +105,14 @@ const FractionInputForm = ({ onSubmit, isLoading }) => {
               <label className="w-24 text-sm font-medium text-gray-700">
                 {'> 2mm :'}
               </label>
-              <input 
-                type="number" 
+              <input
+                type="text"
                 name="taux_2mm"
-                step="0.01"
-                min="0"
-                max="100"
                 value={fractions.taux_2mm}
                 onChange={handleChange}
+                pattern="[0-9]*\.?[0-9]*"
+                inputMode="decimal"
+                placeholder="0.00"
                 className="flex-1 border rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500"
                 required
               />
@@ -105,14 +123,14 @@ const FractionInputForm = ({ onSubmit, isLoading }) => {
               <label className="w-24 text-sm font-medium text-gray-700">
                 {'1-2mm :'}
               </label>
-              <input 
-                type="number" 
+              <input
+                type="text"
                 name="taux_1mm"
-                step="0.01"
-                min="0"
-                max="100"
                 value={fractions.taux_1mm}
                 onChange={handleChange}
+                pattern="[0-9]*\.?[0-9]*"
+                inputMode="decimal"
+                placeholder="0.00"
                 className="flex-1 border rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500"
                 required
               />
@@ -123,14 +141,14 @@ const FractionInputForm = ({ onSubmit, isLoading }) => {
               <label className="w-24 text-sm font-medium text-gray-700">
                 {'500μm-1mm :'}
               </label>
-              <input 
-                type="number" 
+              <input
+                type="text"
                 name="taux_500um"
-                step="0.01"
-                min="0"
-                max="100"
                 value={fractions.taux_500um}
                 onChange={handleChange}
+                pattern="[0-9]*\.?[0-9]*"
+                inputMode="decimal"
+                placeholder="0.00"
                 className="flex-1 border rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500"
                 required
               />
@@ -141,14 +159,14 @@ const FractionInputForm = ({ onSubmit, isLoading }) => {
               <label className="w-24 text-sm font-medium text-gray-700">
                 {'250-500μm :'}
               </label>
-              <input 
-                type="number" 
+              <input
+                type="text"
                 name="taux_250um"
-                step="0.01"
-                min="0"
-                max="100"
                 value={fractions.taux_250um}
                 onChange={handleChange}
+                pattern="[0-9]*\.?[0-9]*"
+                inputMode="decimal"
+                placeholder="0.00"
                 className="flex-1 border rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500"
                 required
               />
@@ -159,14 +177,14 @@ const FractionInputForm = ({ onSubmit, isLoading }) => {
               <label className="w-24 text-sm font-medium text-gray-700">
                 {'< 250μm :'}
               </label>
-              <input 
-                type="number" 
+              <input
+                type="text"
                 name="taux_0"
-                step="0.01"
-                min="0"
-                max="100"
                 value={fractions.taux_0}
                 onChange={handleChange}
+                pattern="[0-9]*\.?[0-9]*"
+                inputMode="decimal"
+                placeholder="0.00"
                 className="flex-1 border rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500"
                 required
               />
