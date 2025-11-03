@@ -1,0 +1,16 @@
+# Dépendances pour le projet thermostraw-analyzer
+# Script de modélisation de la conductivité thermique
+
+# Data manipulation
+pandas>=2.0.0
+numpy>=1.24.0
+openpyxl>=3.1.0  # Pour lire les fichiers Excel
+
+# Machine Learning
+scikit-learn>=1.3.0
+
+# Visualisation
+matplotlib>=3.7.0
+
+# Sauvegarde de modèles
+joblib>=1.3.0
