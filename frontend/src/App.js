@@ -106,7 +106,7 @@ function App() {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-2xl font-bold">ThermoStraw Analyzer</h1>
-              <p className="text-sm opacity-90">Modèle GP V4-BEST avec indicateur EE_best</p>
+              <p className="text-sm opacity-90">Modèle GP22 optimisé - 22 échantillons calibrés</p>
             </div>
             <div className="text-right">
               <p className="text-sm opacity-90">Seuil de conformité</p>

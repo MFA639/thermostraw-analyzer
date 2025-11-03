@@ -43,9 +43,9 @@ const PredictionSummary = ({ prediction, inputData }) => {
 
   // Informations du modèle (avec valeurs par défaut si non disponibles)
   const modelInfo = prediction.model_info || {};
-  const modelName = modelInfo.name || 'GP V4-BEST';
-  const modelVersion = modelInfo.version || 'v1.0';
-  const modelDate = modelInfo.date || '2024';
+  const modelName = modelInfo.name || 'GP22 optimisé';
+  const modelVersion = modelInfo.version || 'v2.0-optimized';
+  const modelDate = modelInfo.date || '2025';
   
   // Déterminer le statut depuis la réponse du backend ou par défaut
   const backendStatus = prediction.status;
